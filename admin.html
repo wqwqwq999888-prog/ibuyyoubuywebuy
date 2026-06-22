@@ -379,12 +379,60 @@ function saveInventory(inv) {
 }
 
 // ── 訂單資料（從 localStorage 讀，實際串 Google 試算表後會改）──
+const ADMIN_API = 'https://script.google.com/macros/s/AKfycbzwY8SxFQ9A-89Srb6v7Tn3-hUN2u9IScUMTGAtw03czpNtBnwxTc9b6WGpm94hU32ULA/exec';
+let _ordersCache = null;
+
+async function fetchOrders() {
+  try {
+    const res = await fetch(ADMIN_API);
+    const data = await res.json();
+    if (Array.isArray(data)) {
+      _ordersCache = data.map(row => ({
+        orderId: row['訂單編號'] || '',
+        time: row['時間戳記'] || row['下單時間'] || '',
+        name: row['姓名'] || '',
+        phone: row['電話'] || '',
+        email: row['Email'] || row['信箱'] || '',
+        shipping: row['配送方式'] || '',
+        deliveryInfo: row['取貨門市/地址'] || '',
+        payment: row['付款方式'] || '銀行匯款',
+        note: row['備註'] || '',
+        itemsText: row['商品明細'] || '',
+        subtotal: row['商品小計'] || '',
+        shippingFee: row['運費'] || '',
+        total: row['總金額'] || '',
+        transfer5: row['轉帳後五碼'] || '',
+        transferTime: row['轉帳時間'] || '',
+        payStatus: row['付款狀態'] || '待付款',
+        shipStatus: row['出貨狀態'] || '待出貨',
+        items: parseItems(row['商品明細'] || ''),
+        _row: row['_row'] || 0,
+      }));
+    }
+    return _ordersCache || [];
+  } catch(e) {
+    console.log('讀取訂單失敗:', e);
+    return [];
+  }
+}
+
+function parseItems(itemsText) {
+  if (!itemsText) return [];
+  return itemsText.split('、').map(item => {
+    const match = item.match(/(.+)x(\d+)/);
+    if (match) {
+      const f = FLAVORS.find(f => f.name === match[1]);
+      return { name: match[1], qty: parseInt(match[2]), price: f ? f.price : 0 };
+    }
+    return { name: item, qty: 1, price: 0 };
+  });
+}
+
 function getOrders() {
-  const saved = localStorage.getItem('dzm_orders');
-  return saved ? JSON.parse(saved) : [];
+  return _ordersCache || [];
 }
 function saveOrders(orders) {
-  localStorage.setItem('dzm_orders', JSON.stringify(orders));
+  // 訂單存在試算表，不需要本地存
 }
 
 // ── 登入 ──
@@ -412,16 +460,19 @@ if (sessionStorage.getItem('dzm_admin')) {
 }
 
 // ── 頁面切換 ──
-function showPage(name, el) {
+async function showPage(name, el) {
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
   document.getElementById('page-' + name).classList.add('active');
   el.classList.add('active');
+  await fetchOrders();
   renderPage(name);
 }
 
 // ── 渲染 ──
-function renderAll() {
+async function renderAll() {
+  showToast('載入訂單中...');
+  await fetchOrders();
   renderPage('dashboard');
   renderInventory();
 }
@@ -528,21 +579,24 @@ function renderOrders() {
 
 function filterOrders() { renderOrders(); }
 
-function updateStatus(idx, type) {
+async function updateStatus(idx, type) {
   const orders = getOrders();
   const sorted = [...orders].sort((a,b) => new Date(b.time) - new Date(a.time));
   const order = sorted[idx];
-  const realIdx = orders.findIndex(o => o.orderId === order.orderId);
-  if (type === 'pay') {
-    orders[realIdx].payStatus = '已付款';
-    showToast('✓ 已標記為已付款');
-  } else {
-    orders[realIdx].shipStatus = '已出貨';
-    showToast('✓ 已標記為已出貨');
+  
+  const col = type === 'pay' ? '付款狀態' : '出貨狀態';
+  const val = type === 'pay' ? '已付款' : '已出貨';
+  const msg = type === 'pay' ? '✓ 已標記為已付款' : '✓ 已標記為已出貨';
+  
+  try {
+    await fetch(`${ADMIN_API}?action=update&row=${order._row}&col=${encodeURIComponent(col)}&val=${encodeURIComponent(val)}`);
+    showToast(msg);
+    await fetchOrders();
+    renderOrders();
+    renderDashboard();
+  } catch(e) {
+    showToast('更新失敗，請重試', true);
   }
-  saveOrders(orders);
-  renderOrders();
-  renderDashboard();
 }
 
 function renderInventory() {
