@@ -410,53 +410,46 @@ nav {
     <div class="panel">
       <div class="panel-title">💳 付款方式</div>
       <div class="payment-options">
-        <label class="payment-option" onclick="selectPayment('credit', this)">
-          <input type="radio" name="payment" value="credit">
-          <div class="radio-dot"></div>
-          <div class="payment-icon">💳</div>
-          <div class="payment-info">
-            <div class="payment-name">信用卡 / 金融卡</div>
-            <div class="payment-sub">Visa、Mastercard、JCB｜支援 Apple Pay、Google Pay</div>
-          </div>
-        </label>
-        <label class="payment-option" onclick="selectPayment('linepay', this)">
-          <input type="radio" name="payment" value="linepay">
-          <div class="radio-dot"></div>
-          <div class="payment-icon">💚</div>
-          <div class="payment-info">
-            <div class="payment-name">LINE Pay</div>
-            <div class="payment-sub">快速、安全的行動支付</div>
-          </div>
-        </label>
-        <label class="payment-option" onclick="selectPayment('atm', this)">
-          <input type="radio" name="payment" value="atm">
-          <div class="radio-dot"></div>
-          <div class="payment-icon">🏧</div>
-          <div class="payment-info">
-            <div class="payment-name">ATM 轉帳</div>
-            <div class="payment-sub">下單後系統自動產生虛擬帳號，3天內轉帳完成</div>
-          </div>
-        </label>
-        <label class="payment-option" onclick="selectPayment('bank', this)">
-          <input type="radio" name="payment" value="bank">
+        <label class="payment-option selected" onclick="selectPayment('bank', this)">
+          <input type="radio" name="payment" value="bank" checked>
           <div class="radio-dot"></div>
           <div class="payment-icon">🏦</div>
           <div class="payment-info">
             <div class="payment-name">銀行匯款</div>
-            <div class="payment-sub">匯款後請回報後五碼，人工確認後出貨</div>
+            <div class="payment-sub">匯款後請傳送後五碼至 LINE 0925-536966，確認後出貨</div>
           </div>
         </label>
+        <div style="margin-top:12px;padding:12px;background:var(--dark3);font-size:12px;color:var(--gold-dim);line-height:1.8;">
+          💳 信用卡、LINE Pay、ATM 轉帳即將開放，敬請期待！
+        </div>
       </div>
 
       <!-- 銀行匯款資訊 -->
-      <div class="bank-details" id="bankDetails">
-        <p>
-          銀行：<strong>玉山銀行 (808)</strong><br>
-          帳號：<strong>（請聯絡客服確認）</strong><br>
-          戶名：<strong>佑陞企業行</strong><br><br>
-          匯款後請傳送「後五碼 + 訂單編號」至<br>
-          訂購專線：<strong>0925-536966</strong>
+      <div class="bank-details show" id="bankDetails">
+        <p style="line-height:2.2;">
+          銀行：<strong style="color:var(--gold)">台灣銀行 (004)</strong><br>
+          戶名：<strong style="color:var(--gold)">蕭百芳</strong><br>
+          帳號：
+          <span id="bankAccount" style="color:var(--gold);font-size:16px;letter-spacing:0.1em;font-weight:700;">0000049004971344</span>
+          <button onclick="copyAccount()" style="margin-left:10px;padding:4px 12px;background:var(--gold);color:var(--black);border:none;cursor:pointer;font-size:12px;font-family:var(--font-body);font-weight:500;" id="copyBtn">
+            複製帳號
+          </button>
         </p>
+        <div style="margin-top:16px;padding-top:16px;border-top:1px solid var(--dark4);">
+          <p style="font-size:13px;color:var(--text);margin-bottom:12px;font-weight:500;">✅ 匯款完成後，請在下方填入轉帳資訊：</p>
+          <div style="display:flex;flex-direction:column;gap:10px;">
+            <div class="field" id="field-transfer5">
+              <label>轉帳後五碼 <span class="req">*</span></label>
+              <input type="text" id="transfer5" maxlength="5" placeholder="例如：12345" style="letter-spacing:0.2em;font-size:18px;">
+              <span class="hint">請輸入你的銀行帳號後五碼，方便我們對帳</span>
+              <span class="err-msg">請填寫轉帳後五碼</span>
+            </div>
+            <div class="field">
+              <label>轉帳時間</label>
+              <input type="datetime-local" id="transferTime">
+            </div>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -524,7 +517,7 @@ const FLAVORS_DATA = [
 
 let cart = {};
 let selectedShipping = '';
-let selectedPayment = '';
+let selectedPayment = 'bank';
 let shippingFee = 0;
 
 // 讀取購物車
@@ -661,6 +654,19 @@ function validate() {
   if (!selectedShipping) { showToast('請選擇配送方式'); ok = false; }
   if (!selectedPayment) { showToast('請選擇付款方式'); ok = false; }
 
+  // 銀行匯款需要填後五碼
+  if (selectedPayment === 'bank') {
+    const t5 = document.getElementById('transfer5').value.trim();
+    const f5 = document.getElementById('field-transfer5');
+    if (!t5 || t5.length !== 5 || !/^\d+$/.test(t5)) {
+      if (f5) f5.classList.add('has-error');
+      showToast('請填寫正確的轉帳後五碼（5位數字）');
+      ok = false;
+    } else {
+      if (f5) f5.classList.remove('has-error');
+    }
+  }
+
   if (selectedShipping === '711') {
     const s = document.getElementById('store711').value.trim();
     setErr('store711', '', !s); if (!s) ok = false;
@@ -704,6 +710,8 @@ function submitOrder() {
     },
     payment: selectedPayment,
     note: document.getElementById('note').value,
+    transfer5: document.getElementById('transfer5')?.value || '',
+    transferTime: document.getElementById('transferTime')?.value || '',
     items: Object.keys(cart).filter(k => cart[k] > 0).map(k => ({
       name: FLAVORS_DATA[k].name,
       price: FLAVORS_DATA[k].price,
@@ -715,7 +723,7 @@ function submitOrder() {
   };
 
   // 1. 先把訂單寫到 Google 試算表
-  const GAS_URL = 'YOUR_GOOGLE_APPS_SCRIPT_URL'; // 部署後填入
+  const GAS_URL = 'https://script.google.com/macros/s/AKfycbwRwtyxF3-EdHy9nT_7ZOn_LLoRPqw-Pf3vTY4m0yISa1YM2tiCSgdpWoLXghAeMo643w/exec'; // 部署後填入
   
   try {
     // 寫入試算表（不等回應，直接進行）
@@ -809,6 +817,19 @@ function showSuccess(order) {
   };
   document.getElementById('paymentInstruction').textContent = payMsg[order.payment] || '';
   window.scrollTo(0, 0);
+}
+
+function copyAccount() {
+  const account = document.getElementById('bankAccount').textContent;
+  navigator.clipboard.writeText(account).then(() => {
+    const btn = document.getElementById('copyBtn');
+    btn.textContent = '已複製！';
+    btn.style.background = 'var(--green)';
+    setTimeout(() => {
+      btn.textContent = '複製帳號';
+      btn.style.background = 'var(--gold)';
+    }, 2000);
+  });
 }
 
 function showToast(msg) {
