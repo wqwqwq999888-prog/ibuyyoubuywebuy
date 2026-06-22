@@ -819,6 +819,10 @@ function showSuccess(order) {
   window.scrollTo(0, 0);
 }
 
+window.gasCallback = function(response) {
+  console.log('GAS 回應:', response);
+};
+
 function copyAccount() {
   const account = document.getElementById('bankAccount').textContent;
   navigator.clipboard.writeText(account).then(() => {
