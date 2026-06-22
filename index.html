@@ -803,10 +803,8 @@ function toggleCart() {
 }
 
 function goCheckout() {
-  // 將購物車存到 sessionStorage 後跳轉結帳頁
   sessionStorage.setItem('cart', JSON.stringify(cart));
-  showToast('跳轉結帳頁...');
-  // window.location.href = '/checkout.html';  // 結帳頁之後串接
+  window.location.href = 'checkout.html';
 }
 
 // ── TOAST ──
