@@ -776,8 +776,6 @@ async function submitOrder() {
     formData.append('entry.46217781', orderData.transfer5 || '');
     formData.append('entry.268682140', orderData.transferTime || '');
     fetch(FORM_URL, { method: 'POST', mode: 'no-cors', body: formData })
-      .catch(e => console.log('表單送出:', e));
-  } catch(e) { console.log('表單錯誤:', e); }
 
   // 2. 判斷付款方式
   if (orderData.payment === 'bank') {
@@ -874,7 +872,6 @@ function showSuccess(order) {
 }
 
 window.gasCallback = function(response) {
-  console.log('GAS 回應:', response);
 };
 
 function copyAccount() {
@@ -897,11 +894,8 @@ function showToast(msg) {
 }
 // 步驟2：顯示確認頁
 function goToStep2() {
-  console.log('goToStep2 called');
   const valid = validateStep1();
-  console.log('validateStep1 result:', valid);
   if (!valid) return;
-  console.log('passed validation, proceeding...');
 
   // 更新步驟
   document.getElementById('step1').classList.remove('active');
@@ -923,12 +917,8 @@ function goToStep2() {
   document.getElementById('confirmTotal').textContent = `NT$ ${subtotal + shippingFee}`;
 
   // 隱藏步驟1，顯示步驟2
-  console.log('hiding mainContent...');
   document.getElementById('mainContent').style.display = 'none';
-  console.log('showing confirmPage...');
   document.getElementById('confirmPage').style.display = 'block';
-  console.log('confirmPage display:', document.getElementById('confirmPage').style.display);
-  console.log('confirmPage offsetHeight:', document.getElementById('confirmPage').offsetHeight);
   window.scrollTo(0, 0);
 
   // 信用卡直接跳綠界
