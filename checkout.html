@@ -766,15 +766,8 @@ function submitOrder() {
   }).replace(/\//g, '/').replace(',', '');
 
   const itemNames = orderData.items.map(i => i.name + 'x' + i.qty).join('#');
-  
   const paymentMap = { credit: 'Credit', linepay: 'LinePay', atm: 'ATM' };
   const choosePayment = paymentMap[orderData.payment] || 'ALL';
-
-  // 建立綠界付款表單（前端 POST 方式）
-  const form = document.createElement('form');
-  form.method = 'POST';
-  form.action = 'https://payment-stage.ecpay.com.tw/Cashier/AioCheckOut/V5';
-  form.style.display = 'none';
 
   const params = {
     MerchantID: '3504484',
@@ -784,8 +777,8 @@ function submitOrder() {
     TotalAmount: String(orderData.total),
     TradeDesc: '鬥陣買肉乾訂購',
     ItemName: itemNames.substring(0, 200),
-    ReturnURL: 'https://wqwqwq999888-prog.github.io/douzhenmai/ecpay-return.html',
-    OrderResultURL: 'https://wqwqwq999888-prog.github.io/douzhenmai/checkout.html',
+    ReturnURL: 'https://merry-biscuit-5014fe.netlify.app/.netlify/functions/ecpay-return',
+    OrderResultURL: 'https://merry-biscuit-5014fe.netlify.app/checkout.html',
     ChoosePayment: choosePayment,
     EncryptType: '1',
     NeedExtraPaidInfo: 'N',
@@ -794,10 +787,26 @@ function submitOrder() {
     CustomField3: orderData.customer.email,
   };
 
-  // 注意：CheckMacValue 需要後端產生（SHA256 加密）
-  // 目前先用測試用假值，正式上線需要後端服務
-  // 這裡先送到測試環境驗證流程
-  
+  // 呼叫後端取得 CheckMacValue
+  try {
+    const res = await fetch('/.netlify/functions/ecpay-checkout', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(params)
+    });
+    const data = await res.json();
+    params.CheckMacValue = data.CheckMacValue;
+  } catch(e) {
+    showToast('付款初始化失敗，請稍後再試');
+    return;
+  }
+
+  // 建立綠界付款表單
+  const form = document.createElement('form');
+  form.method = 'POST';
+  form.action = 'https://payment.ecpay.com.tw/Cashier/AioCheckOut/V5';
+  form.style.display = 'none';
+
   Object.keys(params).forEach(key => {
     const input = document.createElement('input');
     input.type = 'hidden';
