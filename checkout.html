@@ -855,6 +855,8 @@ function showSuccess(order) {
   document.getElementById('step3').classList.add('active');
 
   document.getElementById('mainContent').style.display = 'none';
+  document.getElementById('transferPage').style.display = 'none';
+  document.getElementById('confirmPage').style.display = 'none';
   const sp = document.getElementById('successPage');
   sp.style.display = 'block';
   document.getElementById('orderNumDisplay').textContent = order.orderId;
