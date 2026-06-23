@@ -1,0 +1,7 @@
+[build]
+  functions = "Netlify/函數"
+
+[[headers]]
+  for = "/*"
+  [headers.values]
+    Access-Control-Allow-Origin = "*"
