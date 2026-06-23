@@ -644,7 +644,8 @@ function selectPayment(type, el) {
   selectedPayment = type;
   document.querySelectorAll('.payment-option').forEach(o => o.classList.remove('selected'));
   el.classList.add('selected');
-  document.getElementById('bankDetails').classList.toggle('show', type === 'bank');
+  const bankDetails = document.getElementById('bankDetails');
+  if (bankDetails) bankDetails.classList.toggle('show', type === 'bank');
 }
 
 // 縣市/郵遞區號
