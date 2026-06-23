@@ -419,22 +419,13 @@ nav {
             <div class="payment-sub">匯款完成後請在下方填入轉帳後五碼</div>
           </div>
         </label>
-       <label class="payment-option" onclick="selectPayment('credit', this)">
-  <input type="radio" name="payment" value="credit">
+       <label class="payment-option" style="opacity:0.5;cursor:not-allowed;" onclick="return false;">
+  <input type="radio" name="payment" value="credit" disabled>
   <div class="radio-dot"></div>
   <div class="payment-icon">💳</div>
   <div class="payment-info">
-    <div class="payment-name">信用卡</div>
+    <div class="payment-name">信用卡 <span style="font-size:11px;color:var(--gold);margin-left:6px;">即將開通</span></div>
     <div class="payment-sub">系統將引導您至綠界金流頁面完成付款</div>
-  </div>
-</label>
-<label class="payment-option" onclick="selectPayment('atm', this)">
-  <input type="radio" name="payment" value="atm">
-  <div class="radio-dot"></div>
-  <div class="payment-icon">🏧</div>
-  <div class="payment-info">
-    <div class="payment-name">ATM 轉帳</div>
-    <div class="payment-sub">系統將提供您虛擬帳號，於 3 天內完成轉帳</div>
   </div>
 </label>
       </div>
@@ -722,10 +713,10 @@ function validate() {
   if (!selectedShipping) { showToast('請選擇配送方式'); ok = false; }
   if (!selectedPayment) { showToast('請選擇付款方式'); ok = false; }
 
-  // 銀行匯款需要填後五碼
+  // 銀行匯款需要填後五碼（讀步驟3的 transfer5b）
   if (selectedPayment === 'bank') {
-    const t5 = document.getElementById('transfer5').value.trim();
-    const f5 = document.getElementById('field-transfer5');
+    const t5 = document.getElementById('transfer5b')?.value.trim() || document.getElementById('transfer5')?.value.trim() || '';
+    const f5 = document.getElementById('field-transfer5b') || document.getElementById('field-transfer5');
     if (!t5 || t5.length !== 5 || !/^\d+$/.test(t5)) {
       if (f5) f5.classList.add('has-error');
       showToast('請填寫正確的轉帳後五碼（5位數字）');
@@ -778,7 +769,7 @@ async function submitOrder() {
     },
     payment: selectedPayment,
     note: document.getElementById('note').value,
-    transfer5: document.getElementById('transfer5')?.value || '',
+    transfer5: document.getElementById('transfer5b')?.value || document.getElementById('transfer5')?.value || '',
     transferTime: document.getElementById('transferTime')?.value || '',
     items: Object.keys(cart).filter(k => cart[k] > 0).map(k => ({
       name: FLAVORS_DATA[k].name,
