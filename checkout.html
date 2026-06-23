@@ -932,7 +932,100 @@ function showToast(msg) {
   t.textContent = msg; t.classList.add('show');
   setTimeout(() => t.classList.remove('show'), 3000);
 }
+// 步驟2：顯示確認頁
+function goToStep2() {
+  if (!validateStep1()) return;
 
+  // 更新步驟
+  document.getElementById('step1').classList.remove('active');
+  document.getElementById('step1').classList.add('done');
+  document.getElementById('step2').classList.add('active');
+
+  // 填入確認頁內容
+  const subtotal = getSubtotal();
+  const items = Object.keys(cart).filter(k => cart[k] > 0).map(k => {
+    const f = FLAVORS_DATA[parseInt(k)];
+    return `<div style="display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--dark3);">
+      <span>${f.name} × ${cart[k]}</span>
+      <span>NT$ ${f.price * cart[k]}</span>
+    </div>`;
+  }).join('');
+  document.getElementById('confirmItems').innerHTML = items;
+  document.getElementById('confirmSubtotal').textContent = `NT$ ${subtotal}`;
+  document.getElementById('confirmShipping').textContent = shippingFee === 0 ? '免運 🎉' : `NT$ ${shippingFee}`;
+  document.getElementById('confirmTotal').textContent = `NT$ ${subtotal + shippingFee}`;
+
+  // 隱藏步驟1，顯示步驟2
+  document.getElementById('checkoutForm').style.display = 'none';
+  document.getElementById('confirmPage').style.display = 'block';
+  window.scrollTo(0, 0);
+
+  // 信用卡直接跳綠界
+  if (selectedPayment === 'credit') {
+    document.getElementById('bankConfirmPanel').style.display = 'none';
+    submitEcpay();
+  }
+}
+
+// 步驟3：顯示填後五碼頁
+function goToStep3() {
+  document.getElementById('step2').classList.remove('active');
+  document.getElementById('step2').classList.add('done');
+  document.getElementById('step3').classList.add('active');
+
+  document.getElementById('confirmPage').style.display = 'none';
+  document.getElementById('transferPage').style.display = 'block';
+  window.scrollTo(0, 0);
+}
+
+// 複製帳號（步驟2用）
+function copyAccount2() {
+  navigator.clipboard.writeText('0000049004971344');
+  const btn = document.getElementById('copyBtn2');
+  btn.textContent = '已複製！';
+  setTimeout(() => btn.textContent = '複製帳號', 2000);
+}
+
+// 只驗證步驟1的欄位
+function validateStep1() {
+  let ok = true;
+  const setErr = (id, show) => {
+    const f = document.getElementById('field-' + id);
+    if (f) f.classList.toggle('has-error', show);
+  };
+
+  const name = document.getElementById('name').value.trim();
+  setErr('name', !name); if (!name) ok = false;
+
+  const phone = document.getElementById('phone').value.trim();
+  const phoneOk = /^09\d{8}$/.test(phone);
+  setErr('phone', !phoneOk); if (!phoneOk) ok = false;
+
+  const email = document.getElementById('email').value.trim();
+  const emailOk = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+  setErr('email', !emailOk); if (!emailOk) ok = false;
+
+  if (!selectedShipping) { showToast('請選擇配送方式'); ok = false; }
+  if (!selectedPayment) { showToast('請選擇付款方式'); ok = false; }
+
+  if (selectedShipping === '711') {
+    const s = document.getElementById('store711').value.trim();
+    setErr('store711', !s); if (!s) ok = false;
+  }
+  if (selectedShipping === 'family') {
+    const s = document.getElementById('storefamily').value.trim();
+    setErr('storefamily', !s); if (!s) ok = false;
+  }
+  if (selectedShipping === 'home') {
+    const city = document.getElementById('city').value;
+    const addr = document.getElementById('address').value.trim();
+    setErr('city', !city); if (!city) ok = false;
+    setErr('address', !addr); if (!addr) ok = false;
+  }
+
+  if (!ok) showToast('請填寫所有必填欄位');
+  return ok;
+}
 // INIT
 loadCart();
 </script>
