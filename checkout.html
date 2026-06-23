@@ -430,36 +430,7 @@ nav {
 </label>
       </div>
 
-      <!-- 銀行匯款資訊 -->
-      <div class="bank-details show" id="bankDetails">
-        <p style="line-height:2.2;">
-          銀行：<strong style="color:var(--gold)">台灣銀行 (004)</strong><br>
-          戶名：<strong style="color:var(--gold)">蕭百芳</strong><br>
-          帳號：
-          <span id="bankAccount" style="color:var(--gold);font-size:16px;letter-spacing:0.1em;font-weight:700;">0000049004971344</span>
-          <button onclick="copyAccount()" style="margin-left:10px;padding:4px 12px;background:var(--gold);color:var(--black);border:none;cursor:pointer;font-size:12px;font-family:var(--font-body);font-weight:500;" id="copyBtn">
-            複製帳號
-          </button>
-        </p>
-        <div style="margin-top:16px;padding-top:16px;border-top:1px solid var(--dark4);">
-          <p style="font-size:13px;color:var(--text);margin-bottom:12px;font-weight:500;">✅ 匯款完成後，請在下方填入轉帳資訊：</p>
-          <div style="display:flex;flex-direction:column;gap:10px;">
-            <div class="field" id="field-transfer5">
-              <label>轉帳後五碼 <span class="req">*</span></label>
-              <input type="text" id="transfer5" maxlength="5" placeholder="例如：12345" style="letter-spacing:0.2em;font-size:18px;">
-              <span class="hint">請輸入你的銀行帳號後五碼，方便我們對帳</span>
-              <span class="err-msg">請填寫轉帳後五碼</span>
-            </div>
-            <div class="field">
-              <label>轉帳時間</label>
-              <input type="datetime-local" id="transferTime">
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- 備註 -->
+       <!-- 備註 -->
     <div class="panel">
       <div class="panel-title">📝 訂單備註 <span>選填</span></div>
       <div class="note-field">
