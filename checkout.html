@@ -749,31 +749,15 @@ async function submitOrder() {
     total: getSubtotal() + shippingFee,
   };
 
-  // 1. 先把訂單寫到 Google 試算表
-  // 送到 Google 表單
+  // 1. 送訂單到 Apps Script（寫試算表 + 寄信給你和客人）
+  const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwRwtyxF3-EdHy9nT_7ZOn_LLoRPqw-Pf3vTY4m0yISa1YM2tiCSgdpWoLXghAeMo643w/exec';
   try {
-    const FORM_URL = 'https://docs.google.com/forms/d/e/1FAIpQLScPDacTqMAs6P2TteIuKADIF9ACX85gl9LC9XTEquvJDMjoYw/formResponse';
-    const shippingMap = { '711':'7-11超商取貨', family:'全家超商取貨', home:'宅配到府' };
-    const shippingText = shippingMap[orderData.shipping.method] || orderData.shipping.method;
-    let deliveryInfo = '';
-    if (orderData.shipping.method === '711') deliveryInfo = orderData.shipping.store711 || '';
-    else if (orderData.shipping.method === 'family') deliveryInfo = orderData.shipping.storefamily || '';
-    else if (orderData.shipping.method === 'home') deliveryInfo = (orderData.shipping.city||'') + ' ' + (orderData.shipping.address||'');
-    const itemsText = orderData.items.map(i => i.name + 'x' + i.qty).join('、');
-    const formData = new FormData();
-    formData.append('entry.1715311874', orderData.orderId);
-    formData.append('entry.1205781855', orderData.customer.name);
-    formData.append('entry.1724557094', orderData.customer.phone);
-    formData.append('entry.1969170557', orderData.customer.email);
-    formData.append('entry.1898962472', itemsText);
-    formData.append('entry.2143466289', 'NT$ ' + orderData.total);
-    formData.append('entry.2120915952', shippingText);
-    formData.append('entry.1493868737', deliveryInfo);
-    formData.append('entry.46217781', orderData.transfer5 || '');
-    formData.append('entry.268682140', orderData.transferTime || '');
-    fetch(FORM_URL, { method: 'POST', mode: 'no-cors', body: formData })
-      .catch(e => console.log('表單送出:', e));
-  } catch(e) { console.log('表單錯誤:', e); }
+    const payload = JSON.stringify(orderData);
+    fetch(APPS_SCRIPT_URL + '?data=' + encodeURIComponent(payload), {
+      method: 'GET',
+      mode: 'no-cors'
+    }).catch(e => console.log('Apps Script 送出:', e));
+  } catch(e) { console.log('Apps Script 錯誤:', e); }
 
   // 2. 判斷付款方式
   if (orderData.payment === 'bank') {
