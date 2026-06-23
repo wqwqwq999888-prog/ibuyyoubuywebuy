@@ -14,13 +14,13 @@
 }
 @import url('https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@400;700&family=Noto+Sans+TC:wght@300;400;500&display=swap');
 *{box-sizing:border-box;margin:0;padding:0;}
-body{background:var(--black);color:var(--text);font-family:var(--font);min-height:100vh;}
+body{background:var(--black);color:var(--text);font-family:var(--font);min-height:100vh;display:flex;flex-direction:column;}
 nav{background:var(--dark);border-bottom:1px solid var(--dark3);padding:16px 40px;display:flex;align-items:center;justify-content:space-between;}
 .nav-logo{font-family:var(--font-d);font-size:20px;color:var(--gold);text-decoration:none;letter-spacing:.1em;}
 .nav-logo span{color:var(--text-dim);font-size:11px;font-weight:300;display:block;letter-spacing:.2em;}
 .nav-back{color:var(--text-dim);text-decoration:none;font-size:13px;}
 .nav-back:hover{color:var(--gold);}
-.wrap{max-width:560px;margin:0 auto;padding:60px 20px;}
+.wrap{max-width:560px;margin:0 auto;padding:60px 20px;flex:1;}
 .title{font-family:var(--font-d);font-size:28px;color:var(--gold);text-align:center;margin-bottom:8px;}
 .sub{font-size:14px;color:var(--text-dim);text-align:center;margin-bottom:40px;}
 .panel{background:var(--dark2);padding:32px;border:1px solid var(--dark3);}
@@ -30,17 +30,29 @@ nav{background:var(--dark);border-bottom:1px solid var(--dark3);padding:16px 40p
 .field input:focus{border-color:var(--gold);}
 .search-btn{width:100%;padding:14px;background:var(--gold);color:var(--black);border:none;font-size:15px;font-weight:500;cursor:pointer;font-family:var(--font);margin-top:8px;transition:background .2s;}
 .search-btn:hover{background:#E8C96A;}
+.search-btn:disabled{opacity:.6;cursor:default;}
 .result{margin-top:24px;display:none;}
 .result-title{font-family:var(--font-d);font-size:18px;color:var(--gold);margin-bottom:20px;}
-.info-row{display:flex;justify-content:space-between;padding:12px 0;border-bottom:1px solid var(--dark3);font-size:14px;}
+.info-row{display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-bottom:1px solid var(--dark3);font-size:14px;gap:12px;}
 .info-row:last-child{border-bottom:none;}
-.info-label{color:var(--text-dim);}
+.info-label{color:var(--text-dim);white-space:nowrap;}
+.info-val{text-align:right;}
 .badge{display:inline-block;padding:3px 10px;font-size:11px;}
 .b-pending{background:rgba(230,126,34,.15);color:var(--orange);}
 .b-paid{background:rgba(39,174,96,.15);color:var(--green);}
 .b-shipping{background:rgba(52,152,219,.15);color:var(--blue);}
 .b-done{background:rgba(201,168,76,.15);color:var(--gold);}
-.not-found{text-align:center;padding:32px;color:var(--text-dim);display:none;}
+.not-found{text-align:center;padding:32px;color:var(--text-dim);display:none;line-height:2;}
+/* 聯絡區塊 */
+.contact-strip{margin-top:32px;background:var(--dark2);border:1px solid var(--dark3);padding:24px 32px;}
+.contact-strip .c-title{font-size:12px;color:var(--text-dim);letter-spacing:.1em;margin-bottom:16px;text-align:center;}
+.contact-links{display:flex;align-items:center;justify-content:center;gap:20px;flex-wrap:wrap;}
+.c-btn{display:inline-flex;align-items:center;gap:8px;padding:10px 18px;font-size:13px;font-family:var(--font);text-decoration:none;border:1px solid var(--dark3);color:var(--text-dim);transition:all .2s;}
+.c-btn:hover{border-color:var(--gold);color:var(--gold);}
+.c-btn svg{flex-shrink:0;}
+.c-line img{vertical-align:middle;}
+/* footer */
+footer{background:var(--dark);border-top:1px solid var(--dark3);padding:20px 40px;text-align:center;font-size:12px;color:var(--text-dim);}
 </style>
 </head>
 <body>
@@ -48,40 +60,71 @@ nav{background:var(--dark);border-bottom:1px solid var(--dark3);padding:16px 40p
   <a href="index.html" class="nav-logo">鬥陣買<span>I BUY. YOU BUY. WE BUY.</span></a>
   <a href="index.html" class="nav-back">← 回首頁</a>
 </nav>
+
 <div class="wrap">
   <div class="title">訂單查詢</div>
   <p class="sub">輸入訂單編號與手機後四碼，即可查詢訂單狀態</p>
+
   <div class="panel">
     <div class="field">
       <label>訂單編號</label>
-      <input type="text" id="trackId" placeholder="例如：DZM1234567890" onkeydown="if(event.key==='Enter')doTrack()">
+      <input type="text" id="trackId" placeholder="例如：DZM1782189893176" onkeydown="if(event.key==='Enter')doTrack()">
     </div>
     <div class="field">
       <label>手機後四碼</label>
       <input type="text" id="trackPhone" maxlength="4" placeholder="例如：5678" onkeydown="if(event.key==='Enter')doTrack()">
     </div>
-    <button class="search-btn" onclick="doTrack()">查詢訂單</button>
+    <button class="search-btn" id="searchBtn" onclick="doTrack()">查詢訂單</button>
+
     <div class="result" id="result">
       <div class="result-title">訂單資訊</div>
       <div id="resultContent"></div>
     </div>
-    <div class="not-found" id="notFound">
-      找不到符合的訂單<br>
-      <span style="font-size:12px">請確認訂單編號與手機號碼是否正確</span><br>
-      <span style="font-size:12px;margin-top:8px;display:block">如有疑問請聯絡 0925-536966</span>
+    <div class="not-found" id="notFound"></div>
+  </div>
+
+  <!-- 聯絡我們 -->
+  <div class="contact-strip">
+    <div class="c-title">有問題嗎？來找我們</div>
+    <div class="contact-links">
+      <!-- LINE 官方加好友 -->
+      <a href="https://lin.ee/wvbqdo7" class="c-btn c-line" target="_blank" rel="noopener">
+        <img src="https://scdn.line-apps.com/n/line_add_friends/btn/zh-Hant.png" alt="加入好友" height="32" border="0">
+      </a>
+      <!-- Facebook 粉絲專頁 -->
+      <a href="https://www.facebook.com/ibuyyoubuywebuy/" class="c-btn" target="_blank" rel="noopener">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="#3b82f6"><path d="M22 12c0-5.52-4.48-10-10-10S2 6.48 2 12c0 4.84 3.44 8.87 8 9.8V15H8v-3h2V9.5C10 7.57 11.57 6 13.5 6H16v3h-2c-.55 0-1 .45-1 1v2h3v3h-3v6.95c5.05-.5 9-4.76 9-9.95z"/></svg>
+        Facebook 粉絲專頁
+      </a>
+      <!-- 電話 -->
+      <a href="tel:0925536966" class="c-btn">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M6.6 10.8c1.4 2.8 3.8 5.1 6.6 6.6l2.2-2.2c.3-.3.7-.4 1-.2 1.1.4 2.3.6 3.6.6.6 0 1 .4 1 1V20c0 .6-.4 1-1 1-9.4 0-17-7.6-17-17 0-.6.4-1 1-1h3.5c.6 0 1 .4 1 1 0 1.3.2 2.5.6 3.6.1.3 0 .7-.2 1L6.6 10.8z"/></svg>
+        0925-536966
+      </a>
     </div>
   </div>
 </div>
+
+<footer>© 鬥陣買肉乾 · 手工製作，用心送達</footer>
+
 <script>
 const ADMIN_API = 'https://script.google.com/macros/s/AKfycbzwY8SxFQ9A-89Srb6v7Tn3-hUN2u9IScUMTGAtw03czpNtBnwxTc9b6WGpm94hU32ULA/exec';
 
 const statusMap = {
-  '待付款': '<span class="badge b-pending">待付款</span>',
-  '已付款': '<span class="badge b-paid">已付款</span>',
-  '待出貨': '<span class="badge b-pending">待出貨</span>',
-  '已出貨': '<span class="badge b-shipping">已出貨 🚚</span>',
-  '已完成': '<span class="badge b-done">已完成 ✓</span>',
+  '待付款':'<span class="badge b-pending">待付款</span>',
+  '已付款':'<span class="badge b-paid">已付款</span>',
+  '待出貨':'<span class="badge b-pending">待出貨</span>',
+  '已出貨':'<span class="badge b-shipping">已出貨 🚚</span>',
+  '已完成':'<span class="badge b-done">已完成 ✓</span>',
 };
+
+// 嘗試所有可能的欄位名稱組合
+function getField(row, ...keys) {
+  for (const k of keys) {
+    if (row[k] !== undefined && row[k] !== '') return row[k];
+  }
+  return '';
+}
 
 async function doTrack() {
   const id = document.getElementById('trackId').value.trim().toUpperCase();
@@ -90,57 +133,69 @@ async function doTrack() {
   document.getElementById('result').style.display = 'none';
   document.getElementById('notFound').style.display = 'none';
 
-  if (!id || !phone4) {
-    showNotFound('請填寫訂單編號與手機後四碼');
-    return;
-  }
+  if (!id || !phone4) { showNotFound('請填寫訂單編號與手機後四碼'); return; }
 
-  // 顯示載入中
-  const btn = document.querySelector('.search-btn');
+  const btn = document.getElementById('searchBtn');
   btn.disabled = true;
   btn.textContent = '查詢中…';
 
   try {
     const res = await fetch(ADMIN_API);
     const data = await res.json();
-
     btn.disabled = false;
     btn.textContent = '查詢訂單';
 
-    if (!Array.isArray(data)) {
+    if (!Array.isArray(data) || data.length === 0) {
       showNotFound('系統暫時無法查詢，請稍後再試');
       return;
     }
 
+    // 偵錯：把第一筆的所有 key 印到 console，幫助確認欄位名稱
+    console.log('=== API 回傳欄位名稱（第一筆）===', Object.keys(data[0]));
+    console.log('=== 第一筆資料 ===', data[0]);
+
     const row = data.find(r => {
-      const rowId = (r['訂單編號'] || '').trim().toUpperCase();
-      const rowPhone = (r['電話'] || '').trim();
+      // 嘗試多種可能的欄位名稱
+      const rowId = getField(r,
+        '訂單編號','Order ID','order_id','orderId','訂單號碼'
+      ).trim().toUpperCase();
+
+      const rowPhone = getField(r,
+        '電話','手機','手機號碼','Phone','phone','聯絡電話','電話號碼'
+      ).trim();
+
+      console.log(`比對：rowId="${rowId}" vs id="${id}" | rowPhone="${rowPhone}" slice(-4)="${rowPhone.slice(-4)}" vs phone4="${phone4}"`);
       return rowId === id && rowPhone.slice(-4) === phone4;
     });
 
     if (!row) {
+      // 找不到時顯示實際欄位名稱（協助除錯）
+      const keys = Object.keys(data[0]);
+      console.warn('找不到訂單。試算表欄位有：', keys);
       showNotFound();
       return;
     }
 
-    const payStatus = row['付款狀態'] || '待付款';
-    const shipStatus = row['出貨狀態'] || '待出貨';
-    const shipping = row['商品方式'] || row['配送方式'] || '';
-    const deliveryInfo = row['取貨門市／地址'] || row['取貨門市/地址'] || '';
-    const transfer5 = row['轉帳後五碼'] || '';
-    const time = row['時間戳記'] || row['下單時間'] || '';
-    const itemsText = row['商品明細'] || '';
-    const total = row['總金額'] || '';
+    const payStatus  = getField(row, '付款狀態','Payment Status') || '待付款';
+    const shipStatus = getField(row, '出貨狀態','Shipping Status') || '待出貨';
+    const shipping   = getField(row, '商品方式','配送方式','Shipping','出貨方式');
+    const deliveryInfo = getField(row, '取貨門市／地址','取貨門市/地址','取貨地址','配送地址');
+    const transfer5  = getField(row, '轉帳後五碼','後五碼','匯款後五碼');
+    const transferTime = getField(row, '轉帳時間','匯款時間');
+    const time       = getField(row, '時間戳記','下單時間','Timestamp','建立時間');
+    const itemsText  = getField(row, '商品明細','商品','Items','訂購商品');
+    const total      = getField(row, '總金額','Total','合計','訂單金額');
 
     document.getElementById('resultContent').innerHTML = `
-      <div class="info-row"><span class="info-label">訂單編號</span><span style="color:var(--gold-dim);font-size:12px">${row['訂單編號']}</span></div>
-      <div class="info-row"><span class="info-label">下單時間</span><span>${time}</span></div>
-      <div class="info-row"><span class="info-label">訂購商品</span><span>${itemsText.replace(/x/g,'×')}</span></div>
-      <div class="info-row"><span class="info-label">訂單金額</span><span style="color:var(--gold)">${total}</span></div>
-      <div class="info-row"><span class="info-label">配送方式</span><span>${shipping}${deliveryInfo ? '　' + deliveryInfo : ''}</span></div>
-      ${transfer5 ? `<div class="info-row"><span class="info-label">轉帳後五碼</span><span>${transfer5}</span></div>` : ''}
-      <div class="info-row"><span class="info-label">付款狀態</span><span>${statusMap[payStatus] || payStatus}</span></div>
-      <div class="info-row"><span class="info-label">出貨狀態</span><span>${statusMap[shipStatus] || shipStatus}</span></div>
+      <div class="info-row"><span class="info-label">訂單編號</span><span class="info-val" style="color:var(--gold-dim);font-size:12px">${getField(row,'訂單編號','Order ID')}</span></div>
+      <div class="info-row"><span class="info-label">下單時間</span><span class="info-val">${time}</span></div>
+      <div class="info-row"><span class="info-label">訂購商品</span><span class="info-val">${itemsText.replace(/x(\d)/g,'×$1')}</span></div>
+      <div class="info-row"><span class="info-label">訂單金額</span><span class="info-val" style="color:var(--gold)">${total}</span></div>
+      ${shipping ? `<div class="info-row"><span class="info-label">配送方式</span><span class="info-val">${shipping}${deliveryInfo?' · '+deliveryInfo:''}</span></div>` : ''}
+      ${transfer5 ? `<div class="info-row"><span class="info-label">轉帳後五碼</span><span class="info-val">${transfer5}</span></div>` : ''}
+      ${transferTime ? `<div class="info-row"><span class="info-label">轉帳時間</span><span class="info-val">${transferTime}</span></div>` : ''}
+      <div class="info-row"><span class="info-label">付款狀態</span><span class="info-val">${statusMap[payStatus]||payStatus}</span></div>
+      <div class="info-row"><span class="info-label">出貨狀態</span><span class="info-val">${statusMap[shipStatus]||shipStatus}</span></div>
       <div style="margin-top:16px;padding:12px;background:var(--dark3);font-size:12px;color:var(--text-dim);line-height:1.8;">
         如有問題請聯絡：<strong style="color:var(--gold)">0925-536966</strong>
       </div>`;
@@ -149,17 +204,16 @@ async function doTrack() {
   } catch(e) {
     btn.disabled = false;
     btn.textContent = '查詢訂單';
+    console.error('查詢錯誤:', e);
     showNotFound('網路錯誤，請稍後再試');
   }
 }
 
 function showNotFound(msg) {
   const el = document.getElementById('notFound');
-  if (msg) {
-    el.innerHTML = `${msg}<br><span style="font-size:12px;margin-top:8px;display:block">如有疑問請聯絡 0925-536966</span>`;
-  } else {
-    el.innerHTML = `找不到符合的訂單<br><span style="font-size:12px">請確認訂單編號與手機號碼是否正確</span><br><span style="font-size:12px;margin-top:8px;display:block">如有疑問請聯絡 0925-536966</span>`;
-  }
+  el.innerHTML = msg
+    ? `${msg}<br><span style="font-size:12px;margin-top:8px;display:block">如有疑問請聯絡 0925-536966</span>`
+    : `找不到符合的訂單<br><span style="font-size:12px">請確認訂單編號與手機號碼是否正確</span><br><span style="font-size:12px;margin-top:8px;display:block">如有疑問請聯絡 0925-536966</span>`;
   el.style.display = 'block';
 }
 </script>
