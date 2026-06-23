@@ -416,12 +416,27 @@ nav {
           <div class="payment-icon">🏦</div>
           <div class="payment-info">
             <div class="payment-name">銀行匯款</div>
-            <div class="payment-sub">匯款後請傳送後五碼至 LINE 0925-536966，確認後出貨</div>
+            <div class="payment-sub">匯款完成後請在下方填入轉帳後五碼</div>
           </div>
         </label>
-        <div style="margin-top:12px;padding:12px;background:var(--dark3);font-size:12px;color:var(--gold-dim);line-height:1.8;">
-          💳 信用卡、LINE Pay、ATM 轉帳即將開放，敬請期待！
-        </div>
+       <label class="payment-option" onclick="selectPayment('credit', this)">
+  <input type="radio" name="payment" value="credit">
+  <div class="radio-dot"></div>
+  <div class="payment-icon">💳</div>
+  <div class="payment-info">
+    <div class="payment-name">信用卡</div>
+    <div class="payment-sub">系統將引導您至綠界金流頁面完成付款</div>
+  </div>
+</label>
+<label class="payment-option" onclick="selectPayment('atm', this)">
+  <input type="radio" name="payment" value="atm">
+  <div class="radio-dot"></div>
+  <div class="payment-icon">🏧</div>
+  <div class="payment-info">
+    <div class="payment-name">ATM 轉帳</div>
+    <div class="payment-sub">系統將提供您虛擬帳號，於 3 天內完成轉帳</div>
+  </div>
+</label>
       </div>
 
       <!-- 銀行匯款資訊 -->
