@@ -924,8 +924,12 @@ function goToStep2() {
   document.getElementById('confirmTotal').textContent = `NT$ ${subtotal + shippingFee}`;
 
   // 隱藏步驟1，顯示步驟2
+  console.log('hiding mainContent...');
   document.getElementById('mainContent').style.display = 'none';
+  console.log('showing confirmPage...');
   document.getElementById('confirmPage').style.display = 'block';
+  console.log('confirmPage display:', document.getElementById('confirmPage').style.display);
+  console.log('confirmPage offsetHeight:', document.getElementById('confirmPage').offsetHeight);
   window.scrollTo(0, 0);
 
   // 信用卡直接跳綠界
