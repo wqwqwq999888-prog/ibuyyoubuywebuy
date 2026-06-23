@@ -112,13 +112,22 @@ const ADMIN_API = 'https://script.google.com/macros/s/AKfycbzwY8SxFQ9A-89Srb6v7T
 
 const statusMap = {
   '待付款':'<span class="badge b-pending">待付款</span>',
+  '查帳中':'<span class="badge b-pending">查帳中 🔍</span>',
   '已付款':'<span class="badge b-paid">已付款</span>',
   '待出貨':'<span class="badge b-pending">待出貨</span>',
   '已出貨':'<span class="badge b-shipping">已出貨 🚚</span>',
   '已完成':'<span class="badge b-done">已完成 ✓</span>',
 };
 
-// 嘗試所有可能的欄位名稱組合
+// 把 row 的 key/value 都 trim，處理試算表欄位名稱有空格的問題
+function normalizeRow(row) {
+  const out = {};
+  for (const k of Object.keys(row)) {
+    out[k.trim()] = typeof row[k] === 'string' ? row[k].trim() : row[k];
+  }
+  return out;
+}
+
 function getField(row, ...keys) {
   for (const k of keys) {
     if (row[k] !== undefined && row[k] !== '') return row[k];
@@ -150,11 +159,11 @@ async function doTrack() {
       return;
     }
 
-    // 偵錯：把第一筆的所有 key 印到 console，幫助確認欄位名稱
-    console.log('=== API 回傳欄位名稱（第一筆）===', Object.keys(data[0]));
-    console.log('=== 第一筆資料 ===', data[0]);
+    // 把所有欄位 key/value trim（處理試算表欄位有空格的問題）
+    const normalized = data.map(normalizeRow);
+    console.log('=== 正規化後欄位名稱 ===', Object.keys(normalized[0]));
 
-    const row = data.find(r => {
+    const row = normalized.find(r => {
       // 嘗試多種可能的欄位名稱
       const rowId = getField(r,
         '訂單編號','Order ID','order_id','orderId','訂單號碼'
@@ -170,13 +179,12 @@ async function doTrack() {
 
     if (!row) {
       // 找不到時顯示實際欄位名稱（協助除錯）
-      const keys = Object.keys(data[0]);
-      console.warn('找不到訂單。試算表欄位有：', keys);
+      console.warn('找不到訂單。正規化後欄位：', Object.keys(normalized[0]));
       showNotFound();
       return;
     }
 
-    const payStatus  = getField(row, '付款狀態','Payment Status') || '待付款';
+    const payStatus  = getField(row, '付款狀態','Payment Status') || '查帳中';
     const shipStatus = getField(row, '出貨狀態','Shipping Status') || '待出貨';
     const shipping   = getField(row, '商品方式','配送方式','Shipping','出貨方式');
     const deliveryInfo = getField(row, '取貨門市／地址','取貨門市/地址','取貨地址','配送地址');
@@ -196,8 +204,12 @@ async function doTrack() {
       ${transferTime ? `<div class="info-row"><span class="info-label">轉帳時間</span><span class="info-val">${transferTime}</span></div>` : ''}
       <div class="info-row"><span class="info-label">付款狀態</span><span class="info-val">${statusMap[payStatus]||payStatus}</span></div>
       <div class="info-row"><span class="info-label">出貨狀態</span><span class="info-val">${statusMap[shipStatus]||shipStatus}</span></div>
-      <div style="margin-top:16px;padding:12px;background:var(--dark3);font-size:12px;color:var(--text-dim);line-height:1.8;">
-        如有問題請聯絡：<strong style="color:var(--gold)">0925-536966</strong>
+      <div style="margin-top:16px;padding:16px;background:var(--dark3);font-size:13px;color:var(--text-dim);line-height:2;text-align:center;">
+        有問題嗎？來 LINE 找我們最快！<br>
+        <a href="https://lin.ee/wvbqdo7" target="_blank" rel="noopener"
+           style="display:inline-block;margin-top:8px;">
+          <img src="https://scdn.line-apps.com/n/line_add_friends/btn/zh-Hant.png" alt="加入好友" height="36" border="0">
+        </a>
       </div>`;
     document.getElementById('result').style.display = 'block';
 
