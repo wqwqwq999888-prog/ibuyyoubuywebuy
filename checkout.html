@@ -510,10 +510,6 @@ nav {
         <input type="text" id="transfer5b" maxlength="5" placeholder="例如：12345" style="letter-spacing:0.2em;font-size:22px;text-align:center;">
         <span class="err-msg">請填寫正確的5位數字</span>
       </div>
-      <div class="field">
-        <label>轉帳時間</label>
-        <input type="datetime-local" id="transferTimeb">
-      </div>
     </div>
     <button class="submit-btn" id="finalSubmitBtn" onclick="submitOrder()" style="margin-top:24px;">確認下單 ✓</button>
   </div>
@@ -776,6 +772,8 @@ async function submitOrder() {
     formData.append('entry.46217781', orderData.transfer5 || '');
     formData.append('entry.268682140', orderData.transferTime || '');
     fetch(FORM_URL, { method: 'POST', mode: 'no-cors', body: formData })
+      .catch(e => console.log('表單送出:', e));
+  } catch(e) { console.log('表單錯誤:', e); }
 
   // 2. 判斷付款方式
   if (orderData.payment === 'bank') {
@@ -894,8 +892,7 @@ function showToast(msg) {
 }
 // 步驟2：顯示確認頁
 function goToStep2() {
-  const valid = validateStep1();
-  if (!valid) return;
+  if (!validateStep1()) return;
 
   // 更新步驟
   document.getElementById('step1').classList.remove('active');
