@@ -73,38 +73,94 @@ nav{background:var(--dark);border-bottom:1px solid var(--dark3);padding:16px 40p
   </div>
 </div>
 <script>
-function doTrack() {
+const ADMIN_API = 'https://script.google.com/macros/s/AKfycbzwY8SxFQ9A-89Srb6v7Tn3-hUN2u9IScUMTGAtw03czpNtBnwxTc9b6WGpm94hU32ULA/exec';
+
+const statusMap = {
+  '待付款': '<span class="badge b-pending">待付款</span>',
+  '已付款': '<span class="badge b-paid">已付款</span>',
+  '待出貨': '<span class="badge b-pending">待出貨</span>',
+  '已出貨': '<span class="badge b-shipping">已出貨 🚚</span>',
+  '已完成': '<span class="badge b-done">已完成 ✓</span>',
+};
+
+async function doTrack() {
   const id = document.getElementById('trackId').value.trim().toUpperCase();
   const phone4 = document.getElementById('trackPhone').value.trim();
-  const orders = JSON.parse(localStorage.getItem('dzm_orders') || '[]');
-  const order = orders.find(o =>
-    o.orderId.toUpperCase() === id && o.phone.slice(-4) === phone4
-  );
+
   document.getElementById('result').style.display = 'none';
   document.getElementById('notFound').style.display = 'none';
-  if (!order) {
-    document.getElementById('notFound').style.display = 'block';
+
+  if (!id || !phone4) {
+    showNotFound('請填寫訂單編號與手機後四碼');
     return;
   }
-  const statusMap = {
-    '待付款':'<span class="badge b-pending">待付款</span>',
-    '已付款':'<span class="badge b-paid">已付款</span>',
-    '待出貨':'<span class="badge b-pending">待出貨</span>',
-    '已出貨':'<span class="badge b-shipping">已出貨 🚚</span>',
-    '已完成':'<span class="badge b-done">已完成 ✓</span>',
-  };
-  document.getElementById('resultContent').innerHTML = `
-    <div class="info-row"><span class="info-label">訂單編號</span><span style="color:var(--gold-dim);font-size:12px">${order.orderId}</span></div>
-    <div class="info-row"><span class="info-label">下單時間</span><span>${order.time}</span></div>
-    <div class="info-row"><span class="info-label">訂購商品</span><span>${order.items.map(i=>i.name+'×'+i.qty).join('、')}</span></div>
-    <div class="info-row"><span class="info-label">訂單金額</span><span style="color:var(--gold)">NT$ ${order.total}</span></div>
-    <div class="info-row"><span class="info-label">配送方式</span><span>${order.shipping}</span></div>
-    <div class="info-row"><span class="info-label">付款狀態</span><span>${statusMap[order.payStatus]||order.payStatus}</span></div>
-    <div class="info-row"><span class="info-label">出貨狀態</span><span>${statusMap[order.shipStatus]||order.shipStatus}</span></div>
-    <div style="margin-top:16px;padding:12px;background:var(--dark3);font-size:12px;color:var(--text-dim);line-height:1.8;">
-      如有問題請聯絡：<strong style="color:var(--gold)">0925-536966</strong>
-    </div>`;
-  document.getElementById('result').style.display = 'block';
+
+  // 顯示載入中
+  const btn = document.querySelector('.search-btn');
+  btn.disabled = true;
+  btn.textContent = '查詢中…';
+
+  try {
+    const res = await fetch(ADMIN_API);
+    const data = await res.json();
+
+    btn.disabled = false;
+    btn.textContent = '查詢訂單';
+
+    if (!Array.isArray(data)) {
+      showNotFound('系統暫時無法查詢，請稍後再試');
+      return;
+    }
+
+    const row = data.find(r => {
+      const rowId = (r['訂單編號'] || '').trim().toUpperCase();
+      const rowPhone = (r['電話'] || '').trim();
+      return rowId === id && rowPhone.slice(-4) === phone4;
+    });
+
+    if (!row) {
+      showNotFound();
+      return;
+    }
+
+    const payStatus = row['付款狀態'] || '待付款';
+    const shipStatus = row['出貨狀態'] || '待出貨';
+    const shipping = row['商品方式'] || row['配送方式'] || '';
+    const deliveryInfo = row['取貨門市／地址'] || row['取貨門市/地址'] || '';
+    const transfer5 = row['轉帳後五碼'] || '';
+    const time = row['時間戳記'] || row['下單時間'] || '';
+    const itemsText = row['商品明細'] || '';
+    const total = row['總金額'] || '';
+
+    document.getElementById('resultContent').innerHTML = `
+      <div class="info-row"><span class="info-label">訂單編號</span><span style="color:var(--gold-dim);font-size:12px">${row['訂單編號']}</span></div>
+      <div class="info-row"><span class="info-label">下單時間</span><span>${time}</span></div>
+      <div class="info-row"><span class="info-label">訂購商品</span><span>${itemsText.replace(/x/g,'×')}</span></div>
+      <div class="info-row"><span class="info-label">訂單金額</span><span style="color:var(--gold)">${total}</span></div>
+      <div class="info-row"><span class="info-label">配送方式</span><span>${shipping}${deliveryInfo ? '　' + deliveryInfo : ''}</span></div>
+      ${transfer5 ? `<div class="info-row"><span class="info-label">轉帳後五碼</span><span>${transfer5}</span></div>` : ''}
+      <div class="info-row"><span class="info-label">付款狀態</span><span>${statusMap[payStatus] || payStatus}</span></div>
+      <div class="info-row"><span class="info-label">出貨狀態</span><span>${statusMap[shipStatus] || shipStatus}</span></div>
+      <div style="margin-top:16px;padding:12px;background:var(--dark3);font-size:12px;color:var(--text-dim);line-height:1.8;">
+        如有問題請聯絡：<strong style="color:var(--gold)">0925-536966</strong>
+      </div>`;
+    document.getElementById('result').style.display = 'block';
+
+  } catch(e) {
+    btn.disabled = false;
+    btn.textContent = '查詢訂單';
+    showNotFound('網路錯誤，請稍後再試');
+  }
+}
+
+function showNotFound(msg) {
+  const el = document.getElementById('notFound');
+  if (msg) {
+    el.innerHTML = `${msg}<br><span style="font-size:12px;margin-top:8px;display:block">如有疑問請聯絡 0925-536966</span>`;
+  } else {
+    el.innerHTML = `找不到符合的訂單<br><span style="font-size:12px">請確認訂單編號與手機號碼是否正確</span><br><span style="font-size:12px;margin-top:8px;display:block">如有疑問請聯絡 0925-536966</span>`;
+  }
+  el.style.display = 'block';
 }
 </script>
 </body>
