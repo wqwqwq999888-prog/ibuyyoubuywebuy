@@ -918,7 +918,7 @@ function goToStep2() {
   document.getElementById('confirmTotal').textContent = `NT$ ${subtotal + shippingFee}`;
 
   // 隱藏步驟1，顯示步驟2
-  document.getElementById('checkoutForm').style.display = 'none';
+  document.getElementById('mainContent').style.display = 'none';
   document.getElementById('confirmPage').style.display = 'block';
   window.scrollTo(0, 0);
 
