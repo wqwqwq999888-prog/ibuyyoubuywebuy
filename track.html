@@ -151,9 +151,9 @@ async function doTrack() {
         '訂單編號','Order ID','order_id','orderId','訂單號碼'
       ).trim().toUpperCase();
 
-      const rowPhone = getField(r,
+      const rowPhone = String(getField(r,
         '電話','手機','手機號碼','Phone','phone','聯絡電話','電話號碼'
-      ).trim();
+      )).trim();
 
       console.log(`比對：rowId="${rowId}" vs id="${id}" | rowPhone="${rowPhone}" slice(-4)="${rowPhone.slice(-4)}" vs phone4="${phone4}"`);
       return rowId === id && rowPhone.slice(-4) === phone4;
