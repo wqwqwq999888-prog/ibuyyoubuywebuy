@@ -262,14 +262,14 @@ nav {
     <div class="step-label">填寫資料</div>
   </div>
   <div class="step-line"></div>
-  <div class="step" id="step2">
+   <div class="step" id="step2">
     <div class="step-num">2</div>
-    <div class="step-label">確認付款</div>
+    <div class="step-label">確認 & 匯款</div>
   </div>
   <div class="step-line"></div>
   <div class="step" id="step3">
     <div class="step-num">3</div>
-    <div class="step-label">完成訂單</div>
+    <div class="step-label">填入後五碼</div>
   </div>
 </div>
 
@@ -489,7 +489,7 @@ nav {
       <div class="total-row grand"><span>總計</span><span id="grandTotal">NT$ 0</span></div>
     </div>
     <div class="submit-panel">
-      <button class="submit-btn" id="submitBtn" onclick="submitOrder()">確認下單</button>
+    <button class="submit-btn" id="submitBtn" onclick="goToStep2()">下一步：確認訂單 →</button>
       <p class="submit-note">點擊下單即表示同意本站服務條款<br>訂單確認後將發送 Email 通知</p>
       <div class="secure-icons">
         <span>🔒 安全加密</span>
@@ -501,7 +501,60 @@ nav {
     </div>
   </div>
 </div>
+<!-- 步驟2：確認訂單 + 匯款 -->
+<div id="confirmPage" style="display:none;max-width:680px;margin:0 auto;padding:20px;">
+  <div class="panel">
+    <div class="panel-title">📋 訂單確認</div>
+    <div id="confirmItems"></div>
+    <div style="margin-top:16px;padding-top:16px;border-top:1px solid var(--dark3);">
+      <div style="display:flex;justify-content:space-between;margin-bottom:8px;">
+        <span style="color:var(--text-dim)">商品小計</span>
+        <span id="confirmSubtotal"></span>
+      </div>
+      <div style="display:flex;justify-content:space-between;margin-bottom:8px;">
+        <span style="color:var(--text-dim)">運費</span>
+        <span id="confirmShipping"></span>
+      </div>
+      <div style="display:flex;justify-content:space-between;font-size:20px;font-weight:700;color:var(--gold);margin-top:12px;">
+        <span>總計</span>
+        <span id="confirmTotal"></span>
+      </div>
+    </div>
+  </div>
 
+  <!-- 銀行匯款資訊 -->
+  <div class="panel" id="bankConfirmPanel">
+    <div class="panel-title">🏦 匯款資訊</div>
+    <p style="line-height:2.4;font-size:15px;">
+      銀行：<strong style="color:var(--gold)">台灣銀行 (004)</strong><br>
+      戶名：<strong style="color:var(--gold)">蕭百芳</strong><br>
+      帳號：<strong style="color:var(--gold);font-size:18px;letter-spacing:0.15em;">0000049004971344</strong>
+      <button onclick="copyAccount2()" id="copyBtn2" style="margin-left:10px;padding:6px 16px;background:var(--gold);color:var(--black);border:none;cursor:pointer;font-size:13px;border-radius:4px;">複製帳號</button>
+    </p>
+    <p style="color:var(--gold-dim);font-size:13px;margin-top:8px;">⚠️ 請將款項匯至以上帳號，匯款完成後點選下方按鈕填入後五碼</p>
+    <button class="submit-btn" onclick="goToStep3()" style="margin-top:16px;">✅ 我已完成匯款，填入後五碼 →</button>
+  </div>
+</div>
+
+<!-- 步驟3：填入後五碼 -->
+<div id="transferPage" style="display:none;max-width:680px;margin:0 auto;padding:20px;">
+  <div class="panel">
+    <div class="panel-title">💰 填入轉帳後五碼</div>
+    <p style="color:var(--text-dim);font-size:13px;margin-bottom:20px;">請填入你的銀行帳號後五碼，方便我們對帳確認</p>
+    <div style="display:flex;flex-direction:column;gap:16px;">
+      <div class="field" id="field-transfer5b">
+        <label>轉帳後五碼 <span class="req">*</span></label>
+        <input type="text" id="transfer5b" maxlength="5" placeholder="例如：12345" style="letter-spacing:0.2em;font-size:22px;text-align:center;">
+        <span class="err-msg">請填寫正確的5位數字</span>
+      </div>
+      <div class="field">
+        <label>轉帳時間</label>
+        <input type="datetime-local" id="transferTimeb">
+      </div>
+    </div>
+    <button class="submit-btn" id="finalSubmitBtn" onclick="submitOrder()" style="margin-top:24px;">確認下單 ✓</button>
+  </div>
+</div>
 </div><!-- end mainContent -->
 
 <!-- 成功頁 -->
