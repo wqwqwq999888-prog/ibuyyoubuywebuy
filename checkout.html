@@ -686,7 +686,7 @@ function validate() {
 }
 
 // 送出訂單
-function submitOrder() {
+async function submitOrder() {
   if (!validate()) return;
 
   const btn = document.getElementById('submitBtn');
