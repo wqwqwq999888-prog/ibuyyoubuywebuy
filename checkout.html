@@ -898,7 +898,11 @@ function showToast(msg) {
 }
 // 步驟2：顯示確認頁
 function goToStep2() {
-  if (!validateStep1()) return;
+  console.log('goToStep2 called');
+  const valid = validateStep1();
+  console.log('validateStep1 result:', valid);
+  if (!valid) return;
+  console.log('passed validation, proceeding...');
 
   // 更新步驟
   document.getElementById('step1').classList.remove('active');
