@@ -539,7 +539,7 @@ function renderOrderSummary() {
   const keys = Object.keys(cart).filter(k => cart[k] > 0);
   let subtotal = 0;
   const html = keys.map(k => {
-    const f = FLAVORS_DATA[k];
+const f = FLAVORS_DATA[parseInt(k)];
     const qty = cart[k];
     subtotal += f.price * qty;
     return `<div class="order-item">
