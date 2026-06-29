@@ -316,15 +316,15 @@ nav {
     <div class="panel">
       <div class="panel-title">🚚 配送方式 <span>運費依方式計算</span></div>
 
-      <div class="shipping-options">
+   <div class="shipping-options">
         <label class="shipping-option" onclick="selectShipping('711', this)">
           <input type="radio" name="shipping" value="711">
           <div class="radio-dot"></div>
           <div class="shipping-info">
             <div class="shipping-name">🏪 7-ELEVEN 超商取貨</div>
-            <div class="shipping-desc">3-5個工作天 · 至指定門市取貨</div>
+            <div class="shipping-desc">3-5個工作天 · 至指定門市取貨 · 滿NT$1,500免運</div>
           </div>
-          <div class="shipping-price" id="price711">NT$ 60</div>
+          <div class="shipping-price" id="price711">NT$ 65</div>
         </label>
 
         <label class="shipping-option" onclick="selectShipping('family', this)">
@@ -332,19 +332,19 @@ nav {
           <div class="radio-dot"></div>
           <div class="shipping-info">
             <div class="shipping-name">🏪 全家 FamilyMart 超商取貨</div>
-            <div class="shipping-desc">3-5個工作天 · 至指定門市取貨</div>
+            <div class="shipping-desc">3-5個工作天 · 至指定門市取貨 · 滿NT$1,500免運</div>
           </div>
-          <div class="shipping-price" id="pricefamily">NT$ 60</div>
+          <div class="shipping-price" id="pricefamily">NT$ 65</div>
         </label>
 
-        <label class="shipping-option" onclick="selectShipping('home', this)">
-          <input type="radio" name="shipping" value="home">
+        <label class="shipping-option" onclick="selectShipping('kuroneko', this)">
+          <input type="radio" name="shipping" value="kuroneko">
           <div class="radio-dot"></div>
           <div class="shipping-info">
-            <div class="shipping-name">📦 宅配到府</div>
-            <div class="shipping-desc">3-7個工作天 · 送達指定地址</div>
+            <div class="shipping-name">🐱 黑貓宅急便</div>
+            <div class="shipping-desc">1-3個工作天 · 到府配送 · 滿NT$2,000免運</div>
           </div>
-          <div class="shipping-price" id="pricehome">NT$ 120</div>
+          <div class="shipping-price" id="pricekuroneko">NT$ 130</div>
         </label>
       </div>
 
@@ -372,8 +372,8 @@ nav {
         </div>
       </div>
 
-      <!-- 宅配欄位 -->
-      <div class="delivery-fields" id="fieldshome">
+     <!-- 黑貓宅配欄位 -->
+      <div class="delivery-fields" id="fieldskuroneko">
         <div style="display:flex;flex-direction:column;gap:12px">
           <div class="form-row">
             <div class="field" id="field-city">
@@ -419,12 +419,12 @@ nav {
             <div class="payment-sub">匯款完成後請在下方填入轉帳後五碼</div>
           </div>
         </label>
-       <label class="payment-option" style="opacity:0.5;cursor:not-allowed;" onclick="return false;">
-  <input type="radio" name="payment" value="credit" disabled>
+       <label class="payment-option" onclick="selectPayment('credit', this)">
+  <input type="radio" name="payment" value="credit">
   <div class="radio-dot"></div>
   <div class="payment-icon">💳</div>
   <div class="payment-info">
-    <div class="payment-name">信用卡 <span style="font-size:11px;color:var(--gold);margin-left:6px;">即將開通</span></div>
+    <div class="payment-name">信用卡</div>
     <div class="payment-sub">系統將引導您至綠界金流頁面完成付款</div>
   </div>
 </label>
@@ -581,14 +581,15 @@ const f = FLAVORS_DATA[parseInt(k)];
   document.getElementById('orderItems').innerHTML = html;
   document.getElementById('subtotalAmt').textContent = `NT$ ${subtotal}`;
 
-  // 免運提示
-  const freeLeft = 1200 - subtotal;
-  if (freeLeft <= 0) {
-    document.getElementById('freeShippingMsg').textContent = '🎉 已達免運門檻！';
-    // 自動設為免運
-    if (selectedShipping) updateTotal(subtotal);
+// 免運提示
+  const freeLeft1500 = 1500 - subtotal;
+  const freeLeft2000 = 2000 - subtotal;
+  if (selectedShipping === '711' || selectedShipping === 'family') {
+    document.getElementById('freeShippingMsg').textContent = subtotal >= 1500 ? '' : `再買 NT$ ${freeLeft1500} 享超商免運`;
+  } else if (selectedShipping === 'kuroneko') {
+    document.getElementById('freeShippingMsg').textContent = subtotal >= 2000 ? '' : `再買 NT$ ${freeLeft2000} 享宅配免運`;
   } else {
-    document.getElementById('freeShippingMsg').textContent = `再買 NT$ ${freeLeft} 享免運`;
+    document.getElementById('freeShippingMsg').textContent = '';
   }
 
   updateTotal(subtotal);
@@ -606,9 +607,14 @@ function updateTotal(subtotal) {
     document.getElementById('grandTotal').textContent = `NT$ ${subtotal}`;
     return;
   }
-  const isFree = subtotal >= 1200;
+  const isCvs = selectedShipping === '711' || selectedShipping === 'family';
+  const isKuroneko = selectedShipping === 'kuroneko';
+  const isFree = isCvs ? subtotal >= 1500 : isKuroneko ? subtotal >= 2000 : false;
+
   if (isFree) shippingFee = 0;
-  else shippingFee = selectedShipping === 'home' ? 120 : 60;
+  else if (isCvs) shippingFee = 65;
+  else if (isKuroneko) shippingFee = 130;
+  else shippingFee = 0;
 
   document.getElementById('shippingAmt').textContent = shippingFee === 0 ? '免運 🎉' : `NT$ ${shippingFee}`;
   document.getElementById('grandTotal').textContent = `NT$ ${subtotal + shippingFee}`;
@@ -616,10 +622,10 @@ function updateTotal(subtotal) {
   // 更新顯示的運費
   ['711','family'].forEach(t => {
     const el = document.getElementById('price' + t);
-    if (el) el.textContent = isFree ? '免運 🎉' : 'NT$ 60';
+    if (el) el.textContent = (isCvs && isFree) ? '免運 🎉' : 'NT$ 65';
   });
-  const homeEl = document.getElementById('pricehome');
-  if (homeEl) homeEl.textContent = isFree ? '免運 🎉' : 'NT$ 120';
+  const kuronekoEl = document.getElementById('pricekuroneko');
+  if (kuronekoEl) kuronekoEl.textContent = (isKuroneko && isFree) ? '免運 🎉' : 'NT$ 130';
 }
 
 // 選配送方式
@@ -960,7 +966,7 @@ function validateStep1() {
     const s = document.getElementById('storefamily').value.trim();
     setErr('storefamily', !s); if (!s) ok = false;
   }
-  if (selectedShipping === 'home') {
+if (selectedShipping === 'kuroneko') {
     const city = document.getElementById('city').value;
     const addr = document.getElementById('address').value.trim();
     setErr('city', !city); if (!city) ok = false;
