@@ -29,7 +29,7 @@ exports.handler = async (event) => {
     LogisticsSubType: logisticsSubType,
     IsCollection: 'N',
     ServerReplyURL: serverReplyUrl,
-    ExtraData: '',
+    ExtraData: 'test',
     Device: '0',
   };
 
