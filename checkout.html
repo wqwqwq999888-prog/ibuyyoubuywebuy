@@ -959,6 +959,38 @@ function goToStep2() {
   }).join('#').substring(0, 200);
 
   const total = subtotal + shippingFee;
+  // 先把訂單寫進試算表（待付款）
+  const orderData = {
+    orderId: merchantTradeNo,
+    customer: {
+      name: document.getElementById('name').value.trim(),
+      phone: document.getElementById('phone').value.trim(),
+      email: document.getElementById('email').value.trim(),
+    },
+    shipping: {
+      method: selectedShipping,
+      store711: document.getElementById('store711')?.value || '',
+      storefamily: document.getElementById('storefamily')?.value || '',
+      city: document.getElementById('city')?.value || '',
+      address: document.getElementById('address')?.value || '',
+    },
+    payment: 'credit',
+    note: document.getElementById('note')?.value || '',
+    items: Object.keys(cart).filter(k => cart[k] > 0).map(k => ({
+      name: FLAVORS_DATA[parseInt(k)].name,
+      price: FLAVORS_DATA[parseInt(k)].price,
+      qty: cart[k]
+    })),
+    subtotal: subtotal,
+    shippingFee: shippingFee,
+    total: total,
+    transfer5: '',
+    transferTime: '',
+  };
+  const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwRwtyxF3-EdHy9nT_7ZOn_LLoRPqw-Pf3vTY4m0yISa1YM2tiCSgdpWoLXghAeMo643w/exec';
+  fetch(APPS_SCRIPT_URL + '?data=' + encodeURIComponent(JSON.stringify(orderData)), {
+    method: 'GET', mode: 'no-cors'
+  }).catch(e => console.log('Apps Script 錯誤:', e));  
 
   const params = {
     MerchantID: '3504484',
