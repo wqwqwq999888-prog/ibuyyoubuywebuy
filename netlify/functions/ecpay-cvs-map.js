@@ -19,7 +19,7 @@ exports.handler = async (event) => {
   const MERCHANT_ID = '3504484';
 
   const qs = event.queryStringParameters || {};
-  const logisticsSubType = qs.type || 'UNIMART';
+  const logisticsSubType = qs.type || 'UNIMARTC2C';
 
   const serverReplyUrl = 'https://astounding-rabanadas-a0a6e1.netlify.app/.netlify/functions/ecpay-cvs-callback';
 
