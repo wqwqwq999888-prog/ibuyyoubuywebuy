@@ -764,7 +764,7 @@ async function submitOrder() {
   };
 
   // 1. 送訂單到 Apps Script（寫試算表 + 寄信給你和客人）
-const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxtcO-NDlRsK1jlJdFSAZeaGCCseVBhxjupYZyLLUvhfeR04N0d2qrwetb9wAVCptb5/exec';
+const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwRwtyxF3-EdHy9nT_7ZOn_LLoRPqw-Pf3vTY4m0yISa1YM2tiCSgdpWoLXghAeMo643w/exec';
   try {
     const payload = JSON.stringify(orderData);
     fetch(APPS_SCRIPT_URL + '?data=' + encodeURIComponent(payload), {
