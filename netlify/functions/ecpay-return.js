@@ -18,12 +18,11 @@ exports.handler = async (event) => {
   let str = `HashKey=${HASH_KEY}`;
   sorted.forEach(key => { str += `&${key}=${params[key]}`; });
   str += `&HashIV=${HASH_IV}`;
-  str = encodeURIComponent(str).toLowerCase();
-  str = str
+  str = encodeURIComponent(str).toLowerCase()
     .replace(/%2d/g, '-').replace(/%5f/g, '_')
     .replace(/%2e/g, '.').replace(/%21/g, '!')
     .replace(/%2a/g, '*').replace(/%28/g, '(')
-    .replace(/%29/g, ')');
+    .replace(/%29/g, ')').replace(/%20/g, '+');
 
   const computedMac = crypto
     .createHash('sha256').update(str).digest('hex').toUpperCase();
@@ -34,7 +33,13 @@ exports.handler = async (event) => {
   }
 
   if (params.RtnCode === '1') {
-    console.log('付款成功，訂單編號:', params.MerchantTradeNo);
+    const orderId = params.MerchantTradeNo;
+    const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwRwtyxF3-EdHy9nT_7ZOn_LLoRPqw-Pf3vTY4m0yISa1YM2tiCSgdpWoLXghAeMo643w/exec';
+    try {
+      await fetch(`${APPS_SCRIPT_URL}?action=updatePayment&orderId=${orderId}&status=已付款`);
+    } catch(e) {
+      console.error('更新試算表失敗:', e);
+    }
   }
 
   return {
