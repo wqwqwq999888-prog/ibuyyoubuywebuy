@@ -794,8 +794,8 @@ const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxtcO-NDlRsK1jl
     TotalAmount: String(orderData.total),
     TradeDesc: '鬥陣買肉乾訂購',
     ItemName: itemNames.substring(0, 200),
-    ReturnURL: 'https://merry-biscuit-5014fe.netlify.app/.netlify/functions/ecpay-return',
-    OrderResultURL: 'https://merry-biscuit-5014fe.netlify.app/checkout.html',
+    ReturnURL: 'https://astounding-rabanadas-a0a6e1.netlify.app/.netlify/functions/ecpay-return',
+    OrderResultURL: 'https://astounding-rabanadas-a0a6e1.netlify.app/checkout.html',
     ChoosePayment: choosePayment,
     EncryptType: '1',
     NeedExtraPaidInfo: 'N',
@@ -915,6 +915,65 @@ function goToStep2() {
     document.getElementById('bankConfirmPanel').style.display = 'none';
     submitEcpay();
   }
+  async function submitEcpay() {
+  const merchantTradeNo = ('DZM' + Date.now()).substring(0, 20);
+  const now = new Date();
+  const pad = n => String(n).padStart(2, '0');
+  const tradeDate = `${now.getFullYear()}/${pad(now.getMonth()+1)}/${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
+
+  const cart = JSON.parse(sessionStorage.getItem('cart') || '{}');
+  const itemNames = Object.keys(cart).map(k => {
+    const f = FLAVORS_DATA[parseInt(k)];
+    return f.name + 'x' + cart[k];
+  }).join('#').substring(0, 200);
+
+  const total = subtotal + shippingFee;
+
+  const params = {
+    MerchantID: '3504484',
+    MerchantTradeNo: merchantTradeNo,
+    MerchantTradeDate: tradeDate,
+    PaymentType: 'aio',
+    TotalAmount: String(total),
+    TradeDesc: '鬥陣買肉乾訂購',
+    ItemName: itemNames,
+    ReturnURL: 'https://astounding-rabanadas-a0a6e1.netlify.app/.netlify/functions/ecpay-return',
+    OrderResultURL: 'https://astounding-rabanadas-a0a6e1.netlify.app/checkout.html',
+    ChoosePayment: 'Credit',
+    EncryptType: '1',
+    NeedExtraPaidInfo: 'N',
+  };
+
+  try {
+    const res = await fetch('/.netlify/functions/ecpay-checkout', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(params)
+    });
+    const data = await res.json();
+    params.CheckMacValue = data.CheckMacValue;
+  } catch(e) {
+    showToast('付款初始化失敗，請稍後再試');
+    return;
+  }
+
+  const form = document.createElement('form');
+  form.method = 'POST';
+  form.action = 'https://payment.ecpay.com.tw/Cashier/AioCheckOut/V5';
+  form.style.display = 'none';
+
+  Object.keys(params).forEach(key => {
+    const input = document.createElement('input');
+    input.type = 'hidden';
+    input.name = key;
+    input.value = params[key];
+    form.appendChild(input);
+  });
+
+  document.body.appendChild(form);
+  sessionStorage.removeItem('cart');
+  form.submit();
+}
 }
 
 // 步驟3：顯示填後五碼頁
