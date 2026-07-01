@@ -1,6 +1,31 @@
 const crypto = require('crypto');
 
+function ecpayEncode(str) {
+  return encodeURIComponent(str)
+    .toLowerCase()
+    .replace(/%2d/g, '-')
+    .replace(/%5f/g, '_')
+    .replace(/%2e/g, '.')
+    .replace(/%21/g, '!')
+    .replace(/%2a/g, '*')
+    .replace(/%28/g, '(')
+    .replace(/%29/g, ')')
+    .replace(/%20/g, '+');
+}
+
 exports.handler = async (event) => {
+  if (event.httpMethod === 'OPTIONS') {
+    return {
+      statusCode: 200,
+      headers: {
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Headers': 'Content-Type',
+        'Access-Control-Allow-Methods': 'POST, OPTIONS',
+      },
+      body: '',
+    };
+  }
+
   if (event.httpMethod !== 'POST') {
     return { statusCode: 405, body: 'Method Not Allowed' };
   }
@@ -10,33 +35,25 @@ exports.handler = async (event) => {
 
   const params = JSON.parse(event.body);
 
-  // 1. 依字母排序
   const sorted = Object.keys(params).sort((a, b) =>
     a.toLowerCase().localeCompare(b.toLowerCase())
   );
 
-  // 2. 組成字串
-  let str = `HashKey=${HASH_KEY}`;
-  sorted.forEach(key => { str += `&${key}=${params[key]}`; });
-  str += `&HashIV=${HASH_IV}`;
+  let raw = `HashKey=${HASH_KEY}`;
+  sorted.forEach(key => { raw += `&${key}=${params[key]}`; });
+  raw += `&HashIV=${HASH_IV}`;
 
-  // 3. URL encode 轉小寫
-  str = encodeURIComponent(str).toLowerCase();
+  const encoded = ecpayEncode(raw);
 
-  // 4. .NET 特殊字元替換
-  str = str
-    .replace(/%2d/g, '-').replace(/%5f/g, '_')
-    .replace(/%2e/g, '.').replace(/%21/g, '!')
-    .replace(/%2a/g, '*').replace(/%28/g, '(')
-    .replace(/%29/g, ')');
-
-  // 5. SHA256 轉大寫
   const checkMacValue = crypto
-    .createHash('sha256').update(str).digest('hex').toUpperCase();
+    .createHash('sha256').update(encoded).digest('hex').toUpperCase();
 
   return {
     statusCode: 200,
-    headers: { 'Access-Control-Allow-Origin': '*' },
+    headers: {
+      'Content-Type': 'application/json',
+      'Access-Control-Allow-Origin': '*',
+    },
     body: JSON.stringify({ CheckMacValue: checkMacValue }),
   };
 };
