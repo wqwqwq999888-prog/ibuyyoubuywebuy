@@ -845,7 +845,7 @@ const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxtcO-NDlRsK1jl
   form.submit();
 }
 function selectCvsStore(type) {
-  const logisticsSubType = type === '711' ? 'UNIMART' : 'FAMI';
+  const logisticsSubType = type === '711' ? 'UNIMARTC2C' : 'FAMIC2C';
   const url = `/.netlify/functions/ecpay-cvs-map?type=${logisticsSubType}`;
   const popup = window.open(url, 'selectStore', 'width=1000,height=700,scrollbars=yes');
   window._cvsStoreType = type;
