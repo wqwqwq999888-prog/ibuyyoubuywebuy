@@ -42,7 +42,7 @@ exports.handler = async (event) => {
   raw += `&HashIV=${HASH_IV}`;
 
   const encoded = ecpayEncode(raw);
-  const mac = crypto.createHash('sha256').update(encoded).digest('hex').toUpperCase();
+  const mac = crypto.createHash('md5').update(encoded).digest('hex').toUpperCase();
   params.CheckMacValue = mac;
 
   const inputs = Object.keys(params).map(k =>
