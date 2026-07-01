@@ -353,9 +353,13 @@ nav {
         <div style="display:flex;flex-direction:column;gap:12px">
           <div class="field" id="field-store711">
             <label>7-11 取貨門市 <span class="req">*</span></label>
-            <input type="text" id="store711" placeholder="請輸入門市名稱，例如：台中文心門市">
-            <span class="hint">📍 可先至 7-11 官網查詢門市名稱</span>
-            <span class="err-msg">請填寫取貨門市</span>
+           <div style="display:flex;gap:8px;align-items:center;">
+              <input type="text" id="store711" placeholder="尚未選擇門市" readonly style="flex:1;background:var(--dark2);cursor:not-allowed;">
+              <button type="button" onclick="selectCvsStore('711')" style="padding:10px 16px;background:var(--gold);color:var(--black);border:none;border-radius:6px;font-size:13px;cursor:pointer;white-space:nowrap;">選擇門市</button>
+            </div>
+            <input type="hidden" id="store711Id">
+            <input type="hidden" id="store711Address">
+            <span class="err-msg">請選擇取貨門市</span>
           </div>
         </div>
       </div>
@@ -365,9 +369,13 @@ nav {
         <div style="display:flex;flex-direction:column;gap:12px">
           <div class="field" id="field-storefamily">
             <label>全家取貨門市 <span class="req">*</span></label>
-            <input type="text" id="storefamily" placeholder="請輸入門市名稱，例如：台中文心門市">
-            <span class="hint">📍 可先至全家官網查詢門市名稱</span>
-            <span class="err-msg">請填寫取貨門市</span>
+          <div style="display:flex;gap:8px;align-items:center;">
+              <input type="text" id="storefamily" placeholder="尚未選擇門市" readonly style="flex:1;background:var(--dark2);cursor:not-allowed;">
+              <button type="button" onclick="selectCvsStore('family')" style="padding:10px 16px;background:var(--gold);color:var(--black);border:none;border-radius:6px;font-size:13px;cursor:pointer;white-space:nowrap;">選擇門市</button>
+            </div>
+            <input type="hidden" id="storefamilyId">
+            <input type="hidden" id="storefamilyAddress">
+            <span class="err-msg">請選擇取貨門市</span>
           </div>
         </div>
       </div>
@@ -836,8 +844,31 @@ const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxtcO-NDlRsK1jl
   sessionStorage.removeItem('cart');
   form.submit();
 }
+function selectCvsStore(type) {
+  const logisticsSubType = type === '711' ? 'UNIMART' : 'FAMI';
+  const url = `/.netlify/functions/ecpay-cvs-map?type=${logisticsSubType}`;
+  const popup = window.open(url, 'selectStore', 'width=1000,height=700,scrollbars=yes');
+  window._cvsStoreType = type;
+  window._cvsPopup = popup;
+}
 
-function showSuccess(order) {
+window.addEventListener('message', function(e) {
+  if (e.data && e.data.storeName) {
+    const type = window._cvsStoreType;
+    if (type === '711') {
+      document.getElementById('store711').value = e.data.storeName;
+      document.getElementById('store711Id').value = e.data.storeId || '';
+      document.getElementById('store711Address').value = e.data.storeAddress || '';
+    } else {
+      document.getElementById('storefamily').value = e.data.storeName;
+      document.getElementById('storefamilyId').value = e.data.storeId || '';
+      document.getElementById('storefamilyAddress').value = e.data.storeAddress || '';
+    }
+    if (window._cvsPopup) window._cvsPopup.close();
+  }
+});
+
+  function showSuccess(order) {
   // 更新步驟
   document.getElementById('step1').classList.remove('active');
   document.getElementById('step1').classList.add('done');
