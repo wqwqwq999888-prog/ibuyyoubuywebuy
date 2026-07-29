@@ -554,6 +554,85 @@ let selectedShipping = '';
 let selectedPayment = 'bank';
 let shippingFee = 0;
 
+// ========== 自動保存 & 回填收件資料 ==========
+  const FORM_DATA_KEY = 'checkoutFormData';
+  const FORM_FIELDS = [
+    'name','phone','email','city','address',
+    'store711','store711Id','store711Address',
+    'storefamily','storefamilyId','storefamilyAddress'
+  ];
+
+  function saveFormData() {
+    const data = {};
+    FORM_FIELDS.forEach(id => {
+      const el = document.getElementById(id);
+      if (el) data[id] = el.value || '';
+    });
+    data.selectedShipping = window.selectedShipping || '';
+    data.selectedPayment = window.selectedPayment || 'bank';
+    try {
+      sessionStorage.setItem(FORM_DATA_KEY, JSON.stringify(data));
+    } catch(e) { console.warn('保存表單失敗:', e); }
+  }
+
+  function loadFormData() {
+    let data = null;
+    try {
+      const saved = sessionStorage.getItem(FORM_DATA_KEY);
+      if (saved) data = JSON.parse(saved);
+    } catch(e) { return; }
+    if (!data) return;
+
+    // 回填一般欄位
+    FORM_FIELDS.forEach(id => {
+      const el = document.getElementById(id);
+      if (el && data[id]) el.value = data[id];
+    });
+
+    // 觸發縣市 change 事件（自動帶入郵遞區號）
+    const cityEl = document.getElementById('city');
+    if (cityEl && data.city) {
+      cityEl.dispatchEvent(new Event('change'));
+    }
+
+    // 回填配送方式
+    if (data.selectedShipping) {
+      const shippingRadio = document.querySelector(`input[name="shipping"][value="${data.selectedShipping}"]`);
+      if (shippingRadio) {
+        shippingRadio.checked = true;
+        shippingRadio.dispatchEvent(new Event('change'));
+      }
+    }
+
+    // 回填付款方式
+    if (data.selectedPayment) {
+      const paymentLabel = document.querySelector(`.payment-option input[value="${data.selectedPayment}"]`);
+      if (paymentLabel) {
+        setTimeout(() => {
+          try { selectPayment(data.selectedPayment, paymentLabel.closest('.payment-option')); } catch(e){}
+        }, 100);
+      }
+    }
+  }
+
+  function bindAutoSave() {
+    FORM_FIELDS.forEach(id => {
+      const el = document.getElementById(id);
+      if (el) {
+        el.addEventListener('input', saveFormData);
+        el.addEventListener('change', saveFormData);
+      }
+    });
+  }
+
+  // 頁面載入時：先回填、再綁定監聽
+  window.addEventListener('DOMContentLoaded', () => {
+    setTimeout(() => {
+      loadFormData();
+      bindAutoSave();
+    }, 200);
+  });
+  
 // 讀取購物車
 function loadCart() {
   const saved = sessionStorage.getItem('cart');
@@ -777,6 +856,7 @@ const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwRwtyxF3-EdHy9
   if (orderData.payment === 'bank') {
     // 銀行匯款：直接顯示成功頁
     sessionStorage.removeItem('cart');
+    sessionStorage.removeItem('checkoutFormData');
     showSuccess(orderData);
     return;
   }
@@ -842,6 +922,7 @@ const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwRwtyxF3-EdHy9
 
   document.body.appendChild(form);
   sessionStorage.removeItem('cart');
+    sessionStorage.removeItem('checkoutFormData');
   form.submit();
 }
 function selectCvsStore(type) {
@@ -1034,7 +1115,8 @@ function goToStep2() {
   });
 
   document.body.appendChild(form);
-  sessionStorage.removeItem('cart');
+ sessionStorage.removeItem('cart');
+    sessionStorage.removeItem('checkoutFormData');
   form.submit();
 }
 }
