@@ -126,6 +126,8 @@ nav {
   background: var(--gold); display: none;
 }
 .shipping-option.selected .radio-dot::after { display: block; }
+.payment-option.selected .radio-dot { border-color: var(--gold); }
+    .payment-option.selected .radio-dot::after { display: block; }
 .shipping-info { flex: 1; }
 .shipping-name { font-size: 15px; color: var(--text); margin-bottom: 2px; }
 .shipping-desc { font-size: 12px; color: var(--text-dim); }
@@ -1152,10 +1154,8 @@ function showToast(msg) {
     form.appendChild(input);
   });
 
-  document.body.appendChild(form);
- sessionStorage.removeItem('cart');
-    sessionStorage.removeItem('checkoutFormData');
-  form.submit();
+ document.body.appendChild(form);
+form.submit();
 }
 }
 
