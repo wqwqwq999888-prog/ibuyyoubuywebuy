@@ -171,7 +171,7 @@ function renderFailure(reason, orderId) {
   <p class="reason">原因：${escapeHTML(reason)}</p>
   ${orderId ? `<p class="oid">訂單編號：${escapeHTML(orderId)}</p>` : ''}
   <p style="margin-top:16px">你可以回到購物車重新結帳，或改用其他付款方式。</p>
-  <a href="/" class="btn">回到首頁</a>
+  <a href="/checkout.html" class="btn">重新付款</a>
 </div>
 </body>
 </html>`;
