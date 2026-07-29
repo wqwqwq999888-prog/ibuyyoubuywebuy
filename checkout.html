@@ -503,7 +503,8 @@ nav {
       <button onclick="copyAccount2()" id="copyBtn2" style="margin-left:10px;padding:6px 16px;background:var(--gold);color:var(--black);border:none;cursor:pointer;font-size:13px;border-radius:4px;">複製帳號</button>
     </p>
     <p style="color:var(--gold-dim);font-size:13px;margin-top:8px;">⚠️ 請將款項匯至以上帳號，匯款完成後點選下方按鈕填入後五碼</p>
-    <button class="submit-btn" onclick="goToStep3()" style="margin-top:16px;">✅ 我已完成匯款，填入後五碼 →</button>
+   <button type="button" onclick="goBackToStep1()" style="margin-top:16px;padding:12px 20px;background:transparent;color:var(--text-dim);border:1px solid var(--dark3);border-radius:6px;font-size:14px;cursor:pointer;margin-right:8px;">← 返回修改</button>
+        <button class="submit-btn" onclick="goToStep3()" style="margin-top:16px;">✅ 我已完成匯款，填入後五碼 →</button>
   </div>
 </div>
 
@@ -519,7 +520,8 @@ nav {
         <span class="err-msg">請填寫正確的5位數字</span>
       </div>
     </div>
-    <button class="submit-btn" id="finalSubmitBtn" onclick="submitOrder()" style="margin-top:24px;">確認下單 ✓</button>
+    <button type="button" onclick="goBackToStep2()" style="margin-top:24px;padding:12px 20px;background:transparent;color:var(--text-dim);border:1px solid var(--dark3);border-radius:6px;font-size:14px;cursor:pointer;margin-right:8px;">← 返回上一步</button>
+      <button class="submit-btn" id="finalSubmitBtn" onclick="submitOrder()" style="margin-top:24px;">確認下單 ✓</button>
   </div>
 </div>
 
@@ -995,9 +997,45 @@ function showToast(msg) {
   setTimeout(() => t.classList.remove('show'), 3000);
 }
 // 步驟2：顯示確認頁
-function goToStep2() {
-  if (!validateStep1()) return;
 
+ // ========== 步驟切換功能：返回上一步 ==========
+  function goBackToStep1() {
+    document.getElementById('confirmPage').style.display = 'none';
+    document.getElementById('transferPage').style.display = 'none';
+    document.getElementById('mainContent').style.display = 'block';
+    document.getElementById('step1').classList.add('active');
+    document.getElementById('step1').classList.remove('done');
+    document.getElementById('step2').classList.remove('active');
+    document.getElementById('step2').classList.remove('done');
+    document.getElementById('step3').classList.remove('active');
+    window.scrollTo(0, 0);
+  }
+
+  function goBackToStep2() {
+    document.getElementById('transferPage').style.display = 'none';
+    document.getElementById('confirmPage').style.display = 'block';
+    document.getElementById('step2').classList.add('active');
+    document.getElementById('step2').classList.remove('done');
+    document.getElementById('step3').classList.remove('active');
+    window.scrollTo(0, 0);
+  }
+
+  // 監聽瀏覽器上一頁，切換到正確步驟
+  window.addEventListener('popstate', (e) => {
+    const step = e.state ? e.state.step : 1;
+    if (step === 2) {
+      // 從步驟3回到步驟2
+      goBackToStep2();
+    } else {
+      // 回到步驟1
+      goBackToStep1();
+    }
+  }); 
+  
+  function goToStep2() {
+  if (!validateStep1()) return;
+  history.pushState({step: 2}, '', '#confirm');
+  
   // 更新步驟
   document.getElementById('step1').classList.remove('active');
   document.getElementById('step1').classList.add('done');
@@ -1123,6 +1161,7 @@ function goToStep2() {
 
 // 步驟3：顯示填後五碼頁
 function goToStep3() {
+  history.pushState({step: 3}, '', '#transfer');
   document.getElementById('step2').classList.remove('active');
   document.getElementById('step2').classList.add('done');
   document.getElementById('step3').classList.add('active');
