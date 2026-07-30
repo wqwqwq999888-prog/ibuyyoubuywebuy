@@ -34,11 +34,12 @@ exports.handler = async (event) => {
   const isSuccess = macOk && paid;
   const orderId = params.MerchantTradeNo || '';
 
-  // 付款成功就順便再同步一次 Google Sheet（作為備援；主要靠 ecpay-return）
-  if (isSuccess) {
-    const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwRwtyxF3-EdHy9nT_7ZOn_LLoRPqw-Pf3vTY4m0yISa1YM2tiCSgdpWoLXghAeMo643w/exec';
+ // 同步付款狀態到 Google Sheet：成功 → 已付款；失敗 → 付款失敗
+  const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwRwtyxF3-EdHy9nT_7ZOn_LLoRPqw-Pf3vTY4m0yISa1YM2tiCSgdpWoLXghAeMo643w/exec';
+  const newStatus = isSuccess ? '已付款' : '付款失敗';
+  if (orderId) {
     try {
-      await fetch(`${APPS_SCRIPT_URL}?action=updatePayment&orderId=${encodeURIComponent(orderId)}&status=已付款`);
+      await fetch(`${APPS_SCRIPT_URL}?action=updatePayment&orderId=${encodeURIComponent(orderId)}&status=${encodeURIComponent(newStatus)}`);
     } catch(e) {
       console.error('更新試算表失敗:', e);
     }
