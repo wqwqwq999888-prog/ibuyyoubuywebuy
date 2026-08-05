@@ -825,10 +825,12 @@ async function submitOrder() {
       phone: document.getElementById('phone').value.trim(),
       email: document.getElementById('email').value.trim(),
     },
-    shipping: {
+   shipping: {
       method: selectedShipping,
       store711: document.getElementById('store711')?.value || '',
+      store711Id: document.getElementById('store711Id')?.value || '',
       storefamily: document.getElementById('storefamily')?.value || '',
+      storefamilyId: document.getElementById('storefamilyId')?.value || '',
       city: document.getElementById('city')?.value || '',
       address: document.getElementById('address')?.value || '',
     },
@@ -1088,10 +1090,12 @@ function showToast(msg) {
       phone: document.getElementById('phone').value.trim(),
       email: document.getElementById('email').value.trim(),
     },
-    shipping: {
+  shipping: {
       method: selectedShipping,
       store711: document.getElementById('store711')?.value || '',
+      store711Id: document.getElementById('store711Id')?.value || '',
       storefamily: document.getElementById('storefamily')?.value || '',
+      storefamilyId: document.getElementById('storefamilyId')?.value || '',
       city: document.getElementById('city')?.value || '',
       address: document.getElementById('address')?.value || '',
     },
