@@ -33,13 +33,18 @@ exports.handler = async (event) => {
   const paid = params.RtnCode === '1';
   const isSuccess = macOk && paid;
   const orderId = params.MerchantTradeNo || '';
+  const tradeNo = params.TradeNo || '';
+  const tradeAmt = params.TradeAmt || '';
 
- // 同步付款狀態到 Google Sheet：成功 → 已付款；失敗 → 付款失敗
+  // 同步付款結果到 Google Sheet：
+  // 成功 → confirmPayment 會正式寫入試算表（帶TradeNo、比對金額）
+  // 失敗 → confirmPayment 會直接清掉暫存資料，不寫入試算表
   const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwRwtyxF3-EdHy9nT_7ZOn_LLoRPqw-Pf3vTY4m0yISa1YM2tiCSgdpWoLXghAeMo643w/exec';
   const newStatus = isSuccess ? '已付款' : '付款失敗';
   if (orderId) {
     try {
-      await fetch(`${APPS_SCRIPT_URL}?action=updatePayment&orderId=${encodeURIComponent(orderId)}&status=${encodeURIComponent(newStatus)}`);
+      const confirmUrl = `${APPS_SCRIPT_URL}?action=confirmPayment&orderId=${encodeURIComponent(orderId)}&status=${encodeURIComponent(newStatus)}&tradeNo=${encodeURIComponent(tradeNo)}&tradeAmt=${encodeURIComponent(tradeAmt)}`;
+      await fetch(confirmUrl);
     } catch(e) {
       console.error('更新試算表失敗:', e);
     }
