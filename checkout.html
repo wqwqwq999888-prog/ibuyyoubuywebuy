@@ -553,6 +553,31 @@ const FLAVORS_DATA = [
   {name:"波波魚卵",price:230},{name:"奢華松露",price:250}
 ];
 
+  const CHECKOUT_COMBOS = [
+  { name: '全家大小都會愛', price: 585, fallbackFlavor: 0 },
+  { name: '就愛火辣辣', price: 585, fallbackFlavor: 0 },
+  { name: '老饕私藏限定', price: 655, fallbackFlavor: 0 }
+];
+
+CHECKOUT_COMBOS.forEach(c => {
+  const fallback = FLAVORS_DATA[c.fallbackFlavor] || FLAVORS_DATA[0];
+
+  // 把組合商品加進 checkout 原本的商品資料
+  FLAVORS_DATA.push({
+    name: c.name,
+    price: c.price
+  });
+
+  // 如果 checkout 會顯示商品圖片，先暫用第一個口味的圖片避免報錯
+  if (
+    fallback &&
+    typeof FLAVOR_IMGS !== 'undefined' &&
+    FLAVOR_IMGS[fallback.name]
+  ) {
+    FLAVOR_IMGS[c.name] = FLAVOR_IMGS[fallback.name];
+  }
+});
+  
 let cart = {};
 let selectedShipping = '';
 let selectedPayment = 'bank';
