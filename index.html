@@ -921,15 +921,15 @@ function updateCart() {
   }).join('');
   
   const subtotal = keys.reduce((a, k) => a + CART_PRODUCTS[k].price * cart[k], 0);
-  const shipping = subtotal >= 1200 ? 0 : 60; // 先預設超商運費60，結帳時再選
+  const shipping = subtotal >= 1500 ? 0 : 65;
   
-  const freeLeft = 1200 - subtotal;
+  const freeLeft = 1500 - subtotal;
   document.getElementById('shippingNote').textContent = freeLeft > 0
     ? `再買 NT$ ${freeLeft} 即可免運！` : '🎉 已達免運門檻！';
   
   document.getElementById('cartSummary').innerHTML = `
     <div class="cart-row"><span>小計</span><span>NT$ ${subtotal}</span></div>
-    <div class="cart-row"><span>運費</span><span>${subtotal >= 1200 ? '免運' : '結帳時選擇'}</span></div>
+    <div class="cart-row"><span>運費</span><span>${subtotal >= 1500 ? '免運' : '結帳時選擇'}</span></div>
     <div class="cart-row total"><span>合計</span><span>NT$ ${subtotal}</span></div>`;
   
   document.getElementById('checkoutBtn').disabled = false;

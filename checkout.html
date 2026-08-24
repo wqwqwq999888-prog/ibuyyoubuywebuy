@@ -440,6 +440,13 @@ nav {
 </label>
       </div>
 
+    <!-- 折扣碼 -->
+    <div class="panel">
+      <div class="panel-title">🏷️ 折扣碼 <span>選填</span></div>
+      <div style="display:flex;gap:10px"><input type="text" id="discountCode" placeholder="請輸入折扣碼" style="flex:1;text-transform:uppercase"><button type="button" onclick="applyDiscountCode()" style="padding:12px 18px;border:0;border-radius:4px;background:var(--gold);color:var(--dark);font-weight:700;cursor:pointer">套用</button></div>
+      <p id="discountMessage" style="margin:8px 0 0;font-size:12px;color:var(--text-dim)"></p>
+    </div>
+
        <!-- 備註 -->
     <div class="panel">
       <div class="panel-title">📝 訂單備註 <span>選填</span></div>
@@ -456,6 +463,7 @@ nav {
     <div class="order-items" id="orderItems"></div>
     <div class="order-totals">
       <div class="total-row"><span>商品小計</span><span id="subtotalAmt">NT$ 0</span></div>
+      <div class="total-row" id="discountRow" style="display:none;color:var(--green)"><span>折扣金額</span><span id="discountAmt">- NT$ 0</span></div>
       <div class="total-row"><span>運費</span><span id="shippingAmt">請選擇配送方式</span></div>
       <div class="free-shipping" id="freeShippingMsg"></div>
       <div class="total-row grand"><span>總計</span><span id="grandTotal">NT$ 0</span></div>
@@ -484,6 +492,7 @@ nav {
         <span style="color:var(--text-dim)">商品小計</span>
         <span id="confirmSubtotal"></span>
       </div>
+      <div id="confirmDiscountRow" style="display:none;justify-content:space-between;margin-bottom:8px;color:var(--green)"><span>折扣金額</span><span id="confirmDiscount"></span></div>
       <div style="display:flex;justify-content:space-between;margin-bottom:8px;">
         <span style="color:var(--text-dim)">運費</span>
         <span id="confirmShipping"></span>
@@ -582,6 +591,8 @@ let cart = {};
 let selectedShipping = '';
 let selectedPayment = 'bank';
 let shippingFee = 0;
+let appliedDiscount = null;
+let discountAmount = 0;
 
 // ========== 自動保存 & 回填收件資料 ==========
   const FORM_DATA_KEY = 'checkoutFormData';
@@ -698,12 +709,13 @@ const f = FLAVORS_DATA[parseInt(k)];
   document.getElementById('subtotalAmt').textContent = `NT$ ${subtotal}`;
 
 // 免運提示
-  const freeLeft1500 = 1500 - subtotal;
-  const freeLeft2000 = 2000 - subtotal;
+  const discountedSubtotal = Math.max(0, subtotal - discountAmount);
+  const freeLeft1500 = 1500 - discountedSubtotal;
+  const freeLeft3000 = 3000 - discountedSubtotal;
   if (selectedShipping === '711' || selectedShipping === 'family') {
-    document.getElementById('freeShippingMsg').textContent = subtotal >= 1500 ? '' : `再買 NT$ ${freeLeft1500} 享超商免運`;
+    document.getElementById('freeShippingMsg').textContent = discountedSubtotal >= 1500 ? '' : `折扣後再買 NT$ ${freeLeft1500} 享超商免運`;
   } else if (selectedShipping === 'kuroneko') {
-    document.getElementById('freeShippingMsg').textContent = subtotal >= 2000 ? '' : `再買 NT$ ${freeLeft2000} 享宅配免運`;
+    document.getElementById('freeShippingMsg').textContent = discountedSubtotal >= 3000 ? '' : `折扣後再買 NT$ ${freeLeft3000} 享宅配免運`;
   } else {
     document.getElementById('freeShippingMsg').textContent = '';
   }
@@ -716,16 +728,42 @@ function getSubtotal() {
     .reduce((a, k) => a + FLAVORS_DATA[k].price * cart[k], 0);
 }
 
+function getAvailableDiscounts() {
+  try { return JSON.parse(localStorage.getItem('ibuy-admin-data-v1') || '{}').discounts || []; }
+  catch(e) { return []; }
+}
+
+function getCampaignPartner(code) {
+  try { const data=JSON.parse(localStorage.getItem('ibuy-admin-data-v1')||'{}'); return (data.campaigns||[]).find(c=>c.discount_code===code)?.partner_name || ''; }
+  catch(e) { return ''; }
+}
+
+function applyDiscountCode() {
+  const code = document.getElementById('discountCode').value.trim().toUpperCase();
+  const message = document.getElementById('discountMessage');
+  const now = new Date();
+  const discount = getAvailableDiscounts().find(d => d.code === code && d.enabled && (!d.starts_at || new Date(d.starts_at) <= now) && (!d.ends_at || new Date(d.ends_at) >= now));
+  const subtotal = getSubtotal();
+  if (!discount) { appliedDiscount=null; discountAmount=0; message.textContent='折扣碼不存在、尚未開始或已過期'; message.style.color='#c0392b'; updateTotal(); return; }
+  if (subtotal < Number(discount.minimum_amount || 0)) { appliedDiscount=null; discountAmount=0; message.textContent=`商品金額需滿 NT$ ${Number(discount.minimum_amount).toLocaleString()} 才能使用`; message.style.color='#c0392b'; updateTotal(); return; }
+  appliedDiscount=discount;
+  discountAmount=discount.discount_type === 'percent' ? Math.round(subtotal * (1 - Number(discount.discount_value)/10)) : Math.min(subtotal, Number(discount.discount_value));
+  message.textContent=`已套用 ${discount.code}`; message.style.color='var(--green)'; updateTotal();
+}
+
 function updateTotal(subtotal) {
   if (subtotal === undefined) subtotal = getSubtotal();
+  const discountedSubtotal = Math.max(0, subtotal - discountAmount);
+  document.getElementById('discountRow').style.display = discountAmount > 0 ? 'flex' : 'none';
+  document.getElementById('discountAmt').textContent = `- NT$ ${discountAmount}`;
   if (!selectedShipping) {
     document.getElementById('shippingAmt').textContent = '請選擇配送方式';
-    document.getElementById('grandTotal').textContent = `NT$ ${subtotal}`;
+    document.getElementById('grandTotal').textContent = `NT$ ${discountedSubtotal}`;
     return;
   }
   const isCvs = selectedShipping === '711' || selectedShipping === 'family';
   const isKuroneko = selectedShipping === 'kuroneko';
-  const isFree = isCvs ? subtotal >= 1500 : isKuroneko ? subtotal >= 2000 : false;
+  const isFree = isCvs ? discountedSubtotal >= 1500 : isKuroneko ? discountedSubtotal >= 3000 : false;
 
   if (isFree) shippingFee = 0;
   else if (isCvs) shippingFee = 65;
@@ -733,7 +771,7 @@ function updateTotal(subtotal) {
   else shippingFee = 0;
 
   document.getElementById('shippingAmt').textContent = shippingFee === 0 ? '免運 🎉' : `NT$ ${shippingFee}`;
-  document.getElementById('grandTotal').textContent = `NT$ ${subtotal + shippingFee}`;
+  document.getElementById('grandTotal').textContent = `NT$ ${discountedSubtotal + shippingFee}`;
 
   // 更新顯示的運費
   ['711','family'].forEach(t => {
@@ -869,8 +907,12 @@ async function submitOrder() {
       qty: cart[k]
     })),
     subtotal: getSubtotal(),
+    productAmount: getSubtotal(),
+    discountAmount: discountAmount,
+    discountCode: appliedDiscount ? appliedDiscount.code : '',
+    partnerName: getCampaignPartner(appliedDiscount ? appliedDiscount.code : ''),
     shippingFee: shippingFee,
-    total: getSubtotal() + shippingFee,
+    total: Math.max(0, getSubtotal() - discountAmount) + shippingFee,
   };
 
   // 1. 送訂單到 Apps Script（寫試算表 + 寄信給你和客人）
@@ -1081,8 +1123,10 @@ function showToast(msg) {
   }).join('');
   document.getElementById('confirmItems').innerHTML = items;
   document.getElementById('confirmSubtotal').textContent = `NT$ ${subtotal}`;
+  document.getElementById('confirmDiscountRow').style.display = discountAmount > 0 ? 'flex' : 'none';
+  document.getElementById('confirmDiscount').textContent = `- NT$ ${discountAmount}`;
   document.getElementById('confirmShipping').textContent = shippingFee === 0 ? '免運 🎉' : `NT$ ${shippingFee}`;
-  document.getElementById('confirmTotal').textContent = `NT$ ${subtotal + shippingFee}`;
+  document.getElementById('confirmTotal').textContent = `NT$ ${Math.max(0, subtotal - discountAmount) + shippingFee}`;
 
   // 隱藏步驟1，顯示步驟2
   document.getElementById('mainContent').style.display = 'none';
@@ -1106,7 +1150,7 @@ function showToast(msg) {
     return f.name + 'x' + cart[k];
   }).join('#').substring(0, 200);
 
-  const total = subtotal + shippingFee;
+  const total = Math.max(0, subtotal - discountAmount) + shippingFee;
   // 先把訂單寫進試算表（待付款）
   const orderData = {
     orderId: merchantTradeNo,
@@ -1132,6 +1176,10 @@ function showToast(msg) {
       qty: cart[k]
     })),
     subtotal: subtotal,
+    productAmount: subtotal,
+    discountAmount: discountAmount,
+    discountCode: appliedDiscount ? appliedDiscount.code : '',
+    partnerName: getCampaignPartner(appliedDiscount ? appliedDiscount.code : ''),
     shippingFee: shippingFee,
     total: total,
     transfer5: '',
