@@ -24,7 +24,9 @@ assert.ok(report.includes('id="year"') && report.includes('id="month"'), '團購
 assert.ok(reportScript.includes('/rest/v1/rpc/partner_monthly_report'), '雲端團購主報表必須呼叫安全的報表函式');
 assert.ok(config.includes("mode: 'supabase'"), '後台應使用 Supabase 雲端模式');
 assert.ok(checkout.includes('id="discountCode"'), '結帳頁必須提供折扣碼欄位');
-assert.ok(checkout.includes('discountedSubtotal >= 3000'), '宅配應以折扣後 3000 元判斷免運');
+assert.ok(checkout.includes('storeData.shipping_methods.find'), '結帳運費必須讀取後台物流設定');
+assert.ok(checkout.includes("f.product_type === 'combo'"), '組合規格必須獨立顯示');
+assert.ok(checkout.includes('StorefrontData.calculateDiscount'), '結帳折扣必須使用共用後台資料計算');
 
 const staticIds = new Set([...html.matchAll(/id="([^"]+)"/g)].map(match => match[1]));
 const referencedIds = new Set([...app.matchAll(/\$\('#([^']+)'\)/g)].map(match => match[1]));
