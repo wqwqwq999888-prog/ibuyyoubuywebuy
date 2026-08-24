@@ -9,7 +9,10 @@ const pageMeta = {
 };
 
 const seedData = {
-  products: structuredClone(window.ADMIN_SEED_PRODUCTS || []),
+  products: structuredClone(window.ADMIN_SEED_PRODUCTS || []).map(product => ({
+    ...product, product_type: String(product.product_no).startsWith('2') ? 'combo' : 'single',
+    combo_items: String(product.product_no).startsWith('2') ? product.name.split('－').slice(1).join('－').split('、').filter(Boolean) : []
+  })),
   shipping_methods: [
     { id: '711', name: '7-ELEVEN', fee: 65, free_threshold: 1500, enabled: true, sort_order: 1 },
     { id: 'family', name: '全家', fee: 65, free_threshold: 1500, enabled: true, sort_order: 2 },
@@ -112,18 +115,41 @@ async function deleteRecord(table, id, idField = 'id') {
 
 async function uploadImage(file, productNo) {
   if (!file) return '';
+  if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) throw new Error('圖片僅支援 JPG、PNG 或 WebP');
+  const uploadFile = await optimizeImage(file);
   if (isLocal) return new Promise((resolve, reject) => {
-    const reader = new FileReader(); reader.onload = () => resolve(reader.result); reader.onerror = reject; reader.readAsDataURL(file);
+    const reader = new FileReader(); reader.onload = () => resolve(reader.result); reader.onerror = reject; reader.readAsDataURL(uploadFile);
   });
-  const extension = (file.name.split('.').pop() || 'jpg').toLowerCase();
+  const extension = uploadFile.type === 'image/webp' ? 'webp' : 'jpg';
   const path = `${productNo}/${Date.now()}.${extension}`;
   const response = await fetch(`${config.supabaseUrl}/storage/v1/object/product-images/${path}`, {
     method: 'POST',
-    headers: { apikey: config.supabaseAnonKey, Authorization: `Bearer ${state.token}`, 'Content-Type': file.type || 'image/jpeg', 'x-upsert': 'false' },
-    body: file
+    headers: { apikey: config.supabaseAnonKey, Authorization: `Bearer ${state.token}`, 'Content-Type': uploadFile.type, 'x-upsert': 'false' },
+    body: uploadFile
   });
-  if (!response.ok) throw new Error('圖片上傳失敗');
+  if (!response.ok) {
+    let detail = '';
+    try { detail = JSON.parse(await response.text()).message || ''; } catch { /* Supabase 未回傳 JSON */ }
+    throw new Error(`圖片上傳失敗${detail ? `：${detail}` : `（HTTP ${response.status}）`}`);
+  }
   return `${config.supabaseUrl}/storage/v1/object/public/product-images/${path}`;
+}
+
+async function optimizeImage(file) {
+  const image = await createImageBitmap(file);
+  const scale = Math.min(1, 1600 / Math.max(image.width, image.height));
+  const canvas = document.createElement('canvas');
+  canvas.width = Math.max(1, Math.round(image.width * scale));
+  canvas.height = Math.max(1, Math.round(image.height * scale));
+  const context = canvas.getContext('2d');
+  context.fillStyle = '#fff'; context.fillRect(0, 0, canvas.width, canvas.height);
+  context.drawImage(image, 0, 0, canvas.width, canvas.height);
+  image.close?.();
+  const type = file.type === 'image/webp' ? 'image/webp' : 'image/jpeg';
+  const blob = await new Promise(resolve => canvas.toBlob(resolve, type, 0.86));
+  if (!blob) throw new Error('瀏覽器無法處理這張圖片，請改用 JPG、PNG 或 WebP');
+  if (blob.size > 5 * 1024 * 1024) throw new Error('圖片處理後仍超過 5 MB，請先縮小圖片再上傳');
+  return blob;
 }
 
 function showAdmin() {
@@ -202,7 +228,9 @@ function openProduct(product = {}) {
     ${input('name','商品名稱',product.name)}
     ${input('price','售價',product.price || 0,{type:'number',min:0,required:true})}
     ${input('cost','成本（選填）',product.cost || 0,{type:'number',min:0,step:'0.01'})}
+    ${input('product_type','商品類型',product.product_type || 'single',{type:'select',choices:[['single','一般商品'],['combo','組合商品']]})}
     ${input('specification','規格',product.specification || '200 克／包',{wide:true,required:true})}
+    ${input('combo_items','組合內容（每行一個品項）',(product.combo_items || []).join('\n'),{type:'textarea',wide:true})}
     ${input('description','商品說明、成分、食品添加物、過敏原',product.description || '',{type:'textarea',wide:true})}
     <div class="wide image-editor"><img id="imagePreview" class="image-preview" src="${escapeHtml(product.image_url || '')}" alt="商品圖片預覽"><div><label for="productImage">商品圖片（每個商品一張）</label><input id="productImage" name="productImage" type="file" accept="image/jpeg,image/png,image/webp"><input name="image_url" type="hidden" value="${escapeHtml(product.image_url || '')}"><p class="image-help">建議使用正方形 JPG、PNG 或 WebP。正式雲端模式會自動上傳並保存圖片網址。</p></div></div>
     ${input('sort_order','顯示順序',product.sort_order ?? 0,{type:'number',min:0})}
@@ -214,7 +242,7 @@ function openProduct(product = {}) {
 
 function openDiscount(item = {}) {
   state.editor = { type: 'discount', originalId: item.id || '' }; $('#modalTitle').textContent = item.id ? '編輯折扣碼' : '新增折扣碼';
-  $('#editorFields').innerHTML = `${input('name','折扣名稱',item.name || '',{required:true})}${input('code','折扣碼',item.code || '',{required:true})}${input('discount_type','折扣方式',item.discount_type || 'fixed',{type:'select',choices:[['fixed','固定金額'],['percent','百分比（輸入 9 代表 9 折）']]})}${input('discount_value','折扣值',item.discount_value || 0,{type:'number',min:0,step:'0.01',required:true})}${input('minimum_amount','最低消費',item.minimum_amount || 0,{type:'number',min:0,required:true})}${input('usage_limit','總使用上限（0 代表不限）',item.usage_limit || 0,{type:'number',min:0})}${input('starts_at','開始時間',toLocalInput(item.starts_at),{type:'datetime-local'})}${input('ends_at','結束時間',toLocalInput(item.ends_at),{type:'datetime-local'})}${input('enabled','狀態',String(item.enabled ?? true),{type:'select',choices:[['true','啟用'],['false','停用']]})}`;
+  $('#editorFields').innerHTML = `${input('name','折扣名稱',item.name || '',{required:true})}${input('code','折扣碼',item.code || '',{required:true})}${input('discount_type','折扣方式',item.discount_type || 'fixed',{type:'select',choices:[['fixed','固定金額'],['percent','百分比（輸入 9 代表 9 折）']]})}${input('discount_value','折扣值',item.discount_value || 0,{type:'number',min:0,step:'0.01',required:true})}${input('minimum_amount','最低消費',item.minimum_amount || 0,{type:'number',min:0,required:true})}${input('applicable_product_nos','適用商品編號（逗號分隔；留白代表全部）',(item.applicable_product_nos || []).join(','),{wide:true})}${input('usage_limit','總使用上限（0 代表不限）',item.usage_limit || 0,{type:'number',min:0})}${input('starts_at','開始時間',toLocalInput(item.starts_at),{type:'datetime-local'})}${input('ends_at','結束時間',toLocalInput(item.ends_at),{type:'datetime-local'})}${input('enabled','狀態',String(item.enabled ?? true),{type:'select',choices:[['true','啟用'],['false','停用']]})}`;
   showModal();
 }
 
@@ -241,12 +269,12 @@ async function submitEditor(event) {
       const duplicate = state.data.products.some(p => p.product_no === data.product_no && p.product_no !== state.editor.originalId);
       if (duplicate) throw new Error('商品編號已經存在');
       const file = $('#productImage').files[0];
-      const record = { product_no:data.product_no,name:data.name.trim(),price:Number(data.price),cost:Number(data.cost || 0),specification:data.specification.trim(),description:data.description.trim(),image_url:file ? await uploadImage(file,data.product_no) : data.image_url,sort_order:Number(data.sort_order || 0),enabled:data.enabled==='true' };
+      const record = { product_no:data.product_no,name:data.name.trim(),price:Number(data.price),cost:Number(data.cost || 0),product_type:data.product_type,combo_items:data.product_type==='combo'?data.combo_items.split('\n').map(v=>v.trim()).filter(Boolean):[],specification:data.specification.trim(),description:data.description.trim(),image_url:file ? await uploadImage(file,data.product_no) : data.image_url,sort_order:Number(data.sort_order || 0),enabled:data.enabled==='true' };
       if (state.editor.originalId && state.editor.originalId !== record.product_no) await deleteRecord('products', state.editor.originalId, 'product_no');
       await saveRecord('products', record, 'product_no');
     } else if (state.editor.type === 'discount') {
       const value = Number(data.discount_value); if (data.discount_type === 'percent' && (value <= 0 || value > 10)) throw new Error('百分比請輸入大於 0 且不超過 10 的折數');
-      const record = { id:state.editor.originalId || newId(),name:data.name.trim(),code:data.code.trim().toUpperCase(),discount_type:data.discount_type,discount_value:value,minimum_amount:Number(data.minimum_amount || 0),usage_limit:Number(data.usage_limit || 0),starts_at:data.starts_at ? new Date(data.starts_at).toISOString() : null,ends_at:data.ends_at ? new Date(data.ends_at).toISOString() : null,enabled:data.enabled==='true' };
+      const record = { id:state.editor.originalId || newId(),name:data.name.trim(),code:data.code.trim().toUpperCase(),discount_type:data.discount_type,discount_value:value,minimum_amount:Number(data.minimum_amount || 0),applicable_product_nos:data.applicable_product_nos.split(',').map(v=>v.trim()).filter(Boolean),usage_limit:Number(data.usage_limit || 0),starts_at:data.starts_at ? new Date(data.starts_at).toISOString() : null,ends_at:data.ends_at ? new Date(data.ends_at).toISOString() : null,enabled:data.enabled==='true' };
       await saveRecord('discounts', record);
     } else {
       if (!data.discount_code) throw new Error('請選擇團購主專屬折扣碼');
