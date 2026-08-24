@@ -720,7 +720,7 @@ function renderOrderSummary() {
   const html = keys.map(k => {
 const f = FLAVORS_DATA[parseInt(k)];
     const qty = cart[k];
-    const imageSource = f.image_url || (FLAVOR_IMGS[f.name] ? `data:image/jpeg;base64,${FLAVOR_IMGS[f.name]}` : '');
+    const imageSource = StorefrontData.imageSource(f.image_url || FLAVOR_IMGS[f.name]);
     subtotal += f.price * qty;
     return `<div class="order-item">
       <img class="order-item-img" src="${imageSource}" alt="${f.name}">

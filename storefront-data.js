@@ -41,6 +41,13 @@
     const parts = product.name.split(/[－—-]/).slice(1).join('－');
     return parts ? parts.split(/[、,，]/).map(value => value.trim()).filter(Boolean) : [];
   }
+  function imageSource(value) {
+    const source = String(value || '').trim();
+    if (!source) return '';
+    if (/^(?:data:|https?:|blob:)/i.test(source)) return source;
+    if (source.startsWith('/') && !source.startsWith('/9j/')) return source;
+    return `data:image/jpeg;base64,${source}`;
+  }
   function eligibleSubtotal(discount, items) {
     // Supabase returns product numbers as strings, while an older cart may
     // contain numbers. Normalise both sides before checking applicability.
@@ -54,5 +61,5 @@
     const reduction = discount.discount_type === 'percent' ? Math.round((amount * (10 - value) / 10) + Number.EPSILON) : Math.min(amount, value);
     return { amount: Math.max(0, reduction), eligibleSubtotal: amount };
   }
-  window.StorefrontData = { load, productKind, comboContents, calculateDiscount };
+  window.StorefrontData = { load, productKind, comboContents, imageSource, calculateDiscount };
 })();

@@ -115,18 +115,41 @@ async function deleteRecord(table, id, idField = 'id') {
 
 async function uploadImage(file, productNo) {
   if (!file) return '';
+  if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) throw new Error('圖片僅支援 JPG、PNG 或 WebP');
+  const uploadFile = await optimizeImage(file);
   if (isLocal) return new Promise((resolve, reject) => {
-    const reader = new FileReader(); reader.onload = () => resolve(reader.result); reader.onerror = reject; reader.readAsDataURL(file);
+    const reader = new FileReader(); reader.onload = () => resolve(reader.result); reader.onerror = reject; reader.readAsDataURL(uploadFile);
   });
-  const extension = (file.name.split('.').pop() || 'jpg').toLowerCase();
+  const extension = uploadFile.type === 'image/webp' ? 'webp' : 'jpg';
   const path = `${productNo}/${Date.now()}.${extension}`;
   const response = await fetch(`${config.supabaseUrl}/storage/v1/object/product-images/${path}`, {
     method: 'POST',
-    headers: { apikey: config.supabaseAnonKey, Authorization: `Bearer ${state.token}`, 'Content-Type': file.type || 'image/jpeg', 'x-upsert': 'false' },
-    body: file
+    headers: { apikey: config.supabaseAnonKey, Authorization: `Bearer ${state.token}`, 'Content-Type': uploadFile.type, 'x-upsert': 'false' },
+    body: uploadFile
   });
-  if (!response.ok) throw new Error('圖片上傳失敗');
+  if (!response.ok) {
+    let detail = '';
+    try { detail = JSON.parse(await response.text()).message || ''; } catch { /* Supabase 未回傳 JSON */ }
+    throw new Error(`圖片上傳失敗${detail ? `：${detail}` : `（HTTP ${response.status}）`}`);
+  }
   return `${config.supabaseUrl}/storage/v1/object/public/product-images/${path}`;
+}
+
+async function optimizeImage(file) {
+  const image = await createImageBitmap(file);
+  const scale = Math.min(1, 1600 / Math.max(image.width, image.height));
+  const canvas = document.createElement('canvas');
+  canvas.width = Math.max(1, Math.round(image.width * scale));
+  canvas.height = Math.max(1, Math.round(image.height * scale));
+  const context = canvas.getContext('2d');
+  context.fillStyle = '#fff'; context.fillRect(0, 0, canvas.width, canvas.height);
+  context.drawImage(image, 0, 0, canvas.width, canvas.height);
+  image.close?.();
+  const type = file.type === 'image/webp' ? 'image/webp' : 'image/jpeg';
+  const blob = await new Promise(resolve => canvas.toBlob(resolve, type, 0.86));
+  if (!blob) throw new Error('瀏覽器無法處理這張圖片，請改用 JPG、PNG 或 WebP');
+  if (blob.size > 5 * 1024 * 1024) throw new Error('圖片處理後仍超過 5 MB，請先縮小圖片再上傳');
+  return blob;
 }
 
 function showAdmin() {

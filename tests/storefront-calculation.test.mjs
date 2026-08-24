@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import vm from 'node:vm';
 const context = { window: { ADMIN_CONFIG: {} }, console, structuredClone, localStorage: { getItem: () => null } };
 vm.runInNewContext(readFileSync(new URL('../storefront-data.js', import.meta.url), 'utf8'), context);
-const { calculateDiscount } = context.window.StorefrontData;
+const { calculateDiscount, imageSource } = context.window.StorefrontData;
 const single = { product_no:'100001', price:200, quantity:1 };
 const combo = { product_no:'200001', price:585, quantity:1 };
 const fixed = { discount_type:'fixed', discount_value:100, minimum_amount:0, applicable_product_nos:[] };
@@ -12,4 +12,7 @@ assert.deepEqual({ ...calculateDiscount(fixed,[combo]) }, { amount:100, eligible
 assert.deepEqual({ ...calculateDiscount({...fixed, applicable_product_nos:['100001']},[single,combo]) }, { amount:100, eligibleSubtotal:200 }, '單包加組合僅折適用品');
 assert.deepEqual({ ...calculateDiscount({...fixed, applicable_product_nos:['100001']},[{...single, product_no:100001},combo]) }, { amount:100, eligibleSubtotal:200 }, '商品編號型別不同仍可套用');
 assert.equal(calculateDiscount({ discount_type:'percent', discount_value:9, minimum_amount:700, applicable_product_nos:[] },[single,combo]).amount, 79, '混合購物車九折四捨五入');
+assert.equal(imageSource('/9j/example'), 'data:image/jpeg;base64,/9j/example', '舊版 Base64 圖片應補上 Data URL 前綴');
+assert.equal(imageSource('https://example.com/product.jpg'), 'https://example.com/product.jpg', '雲端圖片網址不應被改寫');
+assert.equal(imageSource('data:image/png;base64,abc'), 'data:image/png;base64,abc', 'Data URL 不應被重複加上前綴');
 console.log('Storefront cart calculations passed.');

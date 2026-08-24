@@ -29,7 +29,9 @@ assert.ok(checkout.includes('storeData.shipping_methods.find'), '結帳運費必
 assert.ok(checkout.includes("f.product_type === 'combo'"), '組合規格必須獨立顯示');
 assert.ok(checkout.includes('StorefrontData.calculateDiscount'), '結帳折扣必須使用共用後台資料計算');
 assert.ok(storefront.includes("image_url:p.img || p.image_url || ''"), '購物車商品快照必須保留前台實際顯示圖片');
-assert.ok(checkout.includes('const imageSource = f.image_url ||'), '結帳商品圖片必須優先使用後台或前台快照圖片');
+assert.ok(checkout.includes('StorefrontData.imageSource(f.image_url || FLAVOR_IMGS[f.name])'), '結帳商品圖片必須支援網址、Data URL 與舊版 Base64 圖片');
+assert.ok(storefront.includes('StorefrontData.imageSource(f.img)') && storefront.includes('StorefrontData.imageSource(c.img)'), '前台一般與組合商品必須使用共用圖片來源處理');
+assert.ok(app.includes('await optimizeImage(file)') && app.includes("blob.size > 5 * 1024 * 1024"), '後台上傳前必須壓縮圖片並檢查 5 MB 限制');
 const paymentPanel = checkout.match(/<section class="panel payment-panel"[\s\S]*?<\/section>/)?.[0] || '';
 const discountPanel = checkout.match(/<section class="panel discount-panel"[\s\S]*?<\/section>/)?.[0] || '';
 const notePanel = checkout.match(/<section class="panel note-panel"[\s\S]*?<\/section>/)?.[0] || '';

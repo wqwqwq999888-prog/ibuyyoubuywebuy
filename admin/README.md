@@ -37,15 +37,16 @@ python -m http.server 8080
 1. 建立 Supabase 專案。
 2. 執行 `supabase/migrations/20260824000000_admin_backend.sql`。
 3. 執行 `supabase/migrations/20260824010000_storefront_catalog.sql`；此 migration 可重複執行，會安全地更新前台唯讀 policy。
-4. 在 Supabase Authentication 建立管理員 Email／密碼帳號。
-5. 到 Authentication 的 users 資料取得該帳號 UUID，加入管理員：
+4. 執行 `supabase/migrations/20260824020000_product_image_storage.sql`；這會建立或修復商品圖片 bucket 與管理員上傳權限。
+5. 在 Supabase Authentication 建立管理員 Email／密碼帳號。
+6. 到 Authentication 的 users 資料取得該帳號 UUID，加入管理員：
 
 ```sql
 insert into public.admin_users(user_id, display_name)
 values ('管理員的 auth user UUID', '商店管理員');
 ```
 
-6. 修改 `admin/config.js`：
+7. 修改 `admin/config.js`：
 
 ```js
 window.ADMIN_CONFIG = {
@@ -64,6 +65,7 @@ window.ADMIN_CONFIG = {
 - 本地模式會將圖片轉成 Data URL 放入瀏覽器暫存，只供測試。
 - 雲端模式會上傳到私有管理權限、公開讀取的 `product-images` bucket，商品只保存圖片 URL。
 - 接受 JPG、PNG、WebP，SQL 設定單檔上限 5 MB。
+- 儲存時會自動將長邊縮至最多 1600px 並壓縮，因此手機或 AI 產生的大圖也可直接選取上傳。
 
 ## 功能名稱
 

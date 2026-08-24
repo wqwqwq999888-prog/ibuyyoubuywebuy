@@ -778,7 +778,7 @@ function renderCombo(idx, btn) {
   const flavorList = StorefrontData.comboContents(c).join('、');
   document.getElementById('comboShowcase').innerHTML = `
     <div class="combo-showcase-img-wrap">
-      <img class="combo-showcase-img" src="data:image/jpeg;base64,${c.img}" alt="${c.name}">
+      <img class="combo-showcase-img" src="${StorefrontData.imageSource(c.img)}" alt="${c.name}">
     </div>
     <div class="combo-showcase-body">
       <div class="combo-showcase-name">${c.name}</div>
@@ -801,7 +801,7 @@ function renderProducts(filter) {
     return `
     <div class="product-card" onclick="openModal(${FLAVORS.indexOf(f)})">
       <div class="product-img-wrap">
-        <img class="product-img" src="data:image/jpeg;base64,${f.img}" alt="${f.name}" loading="lazy">
+        <img class="product-img" src="${StorefrontData.imageSource(f.img)}" alt="${f.name}" loading="lazy">
         <div class="product-tag ${isPremium ? 'premium' : ''}">${f.tag}</div>
       </div>
       <div class="product-info">
@@ -830,7 +830,7 @@ function openModal(idx) {
   const f = FLAVORS[idx];
   const m = document.getElementById('modalContent');
   m.innerHTML = `
-    <img class="modal-img" src="data:image/jpeg;base64;${f.img}" alt="${f.name}">
+    <img class="modal-img" src="${StorefrontData.imageSource(f.img)}" alt="${f.name}">
     <div class="modal-body">
       <div class="modal-tag">${f.tag} · 豬肉條肉乾</div>
       <div class="modal-name">${f.name}</div>
@@ -856,7 +856,7 @@ function openModal(idx) {
       </div>
     </div>`;
   // fix base64 src
-  m.querySelector('.modal-img').src = `data:image/jpeg;base64,${f.img}`;
+  m.querySelector('.modal-img').src = StorefrontData.imageSource(f.img);
   document.getElementById('modalOverlay').classList.add('open');
   document.body.style.overflow = 'hidden';
 }
@@ -909,7 +909,7 @@ function updateCart() {
     const f = CART_PRODUCTS[k];
     const q = cart[k];
     return `<div class="cart-item">
-      <img class="cart-item-img" src="data:image/jpeg;base64,${f.img}" alt="${f.name}">
+      <img class="cart-item-img" src="${StorefrontData.imageSource(f.img)}" alt="${f.name}">
       <div style="flex:1">
         <div class="cart-item-name">${f.name}</div>
         <div class="cart-item-price">NT$ ${f.price} / ${f.unit || '包'}</div>
