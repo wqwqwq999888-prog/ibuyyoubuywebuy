@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>商店管理後台｜鬥陣買肉乾</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div id="loginView" class="login-shell hidden">
+    <form id="loginForm" class="login-card">
+      <div class="brand-mark">鬥陣買</div>
+      <h1>管理後台</h1>
+      <p>請使用管理員帳號登入</p>
+      <label>Email<input id="loginEmail" type="email" autocomplete="username" required></label>
+      <label>密碼<input id="loginPassword" type="password" autocomplete="current-password" required></label>
+      <p id="loginError" class="form-error"></p>
+      <button class="primary-button full" type="submit">登入</button>
+    </form>
+  </div>
+
+  <div id="adminView" class="app-shell hidden">
+    <aside class="sidebar">
+      <div class="sidebar-brand">
+        <span class="brand-mark">鬥陣買</span>
+        <small>商店管理後台</small>
+      </div>
+      <nav id="sideNav" aria-label="管理功能">
+        <button class="nav-item active" data-page="products"><span>01</span>商品管理</button>
+        <button class="nav-item" data-page="shipping"><span>02</span>物流管理</button>
+        <button class="nav-item" data-page="discounts"><span>03</span>折扣管理</button>
+        <button class="nav-item" data-page="campaigns"><span>04</span>團購管理</button>
+      </nav>
+      <div class="sidebar-footer">
+        <span id="modeBadge" class="mode-badge">本地模式</span>
+        <button id="logoutButton" class="text-button hidden">登出</button>
+      </div>
+    </aside>
+
+    <main class="main-content">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">I BUY · YOU BUY · WE BUY</p>
+          <h1 id="pageTitle">商品管理</h1>
+        </div>
+        <div class="topbar-actions">
+          <span id="saveStatus" class="save-status">資料已同步</span>
+          <button id="primaryAction" class="primary-button">新增商品</button>
+        </div>
+      </header>
+
+      <section id="productsPage" class="page active">
+        <div class="local-guide" id="localGuide">
+          <div>
+            <strong>現在是安全的本地預覽</strong>
+            <span>您在這裡新增、改價或換圖，只會保存在目前這個瀏覽器，不會修改正式官網，也不會影響客人下單。</span>
+          </div>
+          <button id="dismissGuide" class="secondary-button" type="button">我知道了</button>
+        </div>
+        <div class="summary-grid">
+          <article class="summary-card"><span>全部商品</span><strong id="productCount">0</strong></article>
+          <article class="summary-card"><span>已上架</span><strong id="activeProductCount">0</strong></article>
+          <article class="summary-card"><span>已下架</span><strong id="inactiveProductCount">0</strong></article>
+        </div>
+        <div class="panel">
+          <div class="panel-toolbar">
+            <div><h2>商品清單</h2><p>單包與組合都以同一種商品方式管理。</p></div>
+            <input id="productSearch" class="search-input" type="search" placeholder="搜尋商品編號或名稱">
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>商品</th><th>商品編號</th><th>規格</th><th>售價</th><th>狀態</th><th></th></tr></thead>
+              <tbody id="productRows"></tbody>
+            </table>
+          </div>
+          <div id="productEmpty" class="empty-state hidden">還沒有商品，請先新增第一項商品。</div>
+        </div>
+      </section>
+
+      <section id="shippingPage" class="page">
+        <div class="info-banner"><strong>免運計算規則</strong><span>折扣後商品小計仍須達到免運門檻，才會免運。</span></div>
+        <form id="shippingForm" class="panel form-panel">
+          <div class="panel-heading"><div><h2>配送與免運設定</h2><p>修改後，未來官網串接時會由後端統一計算。</p></div><button class="primary-button" type="submit">儲存設定</button></div>
+          <div id="shippingCards" class="shipping-grid"></div>
+        </form>
+      </section>
+
+      <section id="discountsPage" class="page">
+        <div class="summary-grid two">
+          <article class="summary-card"><span>全部折扣碼</span><strong id="discountCount">0</strong></article>
+          <article class="summary-card"><span>有效折扣碼</span><strong id="activeDiscountCount">0</strong></article>
+        </div>
+        <div class="panel">
+          <div class="panel-heading"><div><h2>折扣碼</h2><p>一張訂單限用一組折扣碼，金額由後端驗證。</p></div></div>
+          <div class="table-wrap"><table><thead><tr><th>折扣碼</th><th>折扣內容</th><th>最低消費</th><th>有效期間</th><th>狀態</th><th></th></tr></thead><tbody id="discountRows"></tbody></table></div>
+          <div id="discountEmpty" class="empty-state hidden">還沒有折扣碼。</div>
+        </div>
+      </section>
+
+      <section id="campaignsPage" class="page">
+        <div class="summary-grid two">
+          <article class="summary-card"><span>全部團購</span><strong id="campaignCount">0</strong></article>
+          <article class="summary-card"><span>進行中</span><strong id="activeCampaignCount">0</strong></article>
+        </div>
+        <div class="panel">
+          <div class="panel-heading"><div><h2>團購活動</h2><p>每個活動都有專屬連結，並綁定一組專屬折扣碼。</p></div></div>
+          <div class="table-wrap"><table><thead><tr><th>活動／團主</th><th>專屬折扣碼</th><th>活動期間</th><th>專屬連結</th><th>狀態</th><th></th></tr></thead><tbody id="campaignRows"></tbody></table></div>
+          <div id="campaignEmpty" class="empty-state hidden">還沒有團購活動。</div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <div id="modalBackdrop" class="modal-backdrop hidden" role="presentation">
+    <section class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+      <header><div><p class="eyebrow">管理資料</p><h2 id="modalTitle"></h2></div><button id="closeModal" class="icon-button" type="button" aria-label="關閉">×</button></header>
+      <form id="editorForm"><div id="editorFields" class="editor-fields"></div><footer><button id="cancelModal" class="secondary-button" type="button">取消</button><button class="primary-button" type="submit">儲存</button></footer></form>
+    </section>
+  </div>
+
+  <div id="toast" class="toast hidden"></div>
+  <script src="config.js"></script>
+  <script src="seed.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
