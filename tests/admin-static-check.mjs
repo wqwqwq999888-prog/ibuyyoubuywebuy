@@ -5,6 +5,7 @@ const html = readFileSync(new URL('../admin/index.html', import.meta.url), 'utf8
 const app = readFileSync(new URL('../admin/app.js', import.meta.url), 'utf8');
 const launcher = readFileSync(new URL('../開啟管理後台.html', import.meta.url), 'utf8');
 const checkout = readFileSync(new URL('../checkout.html', import.meta.url), 'utf8');
+const storefront = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
 const report = readFileSync(new URL('../partner-report.html', import.meta.url), 'utf8');
 const reportScript = readFileSync(new URL('../partner-report.js', import.meta.url), 'utf8');
 const config = readFileSync(new URL('../admin/config.js', import.meta.url), 'utf8');
@@ -24,7 +25,18 @@ assert.ok(report.includes('id="year"') && report.includes('id="month"'), '團購
 assert.ok(reportScript.includes('/rest/v1/rpc/partner_monthly_report'), '雲端團購主報表必須呼叫安全的報表函式');
 assert.ok(config.includes("mode: 'supabase'"), '後台應使用 Supabase 雲端模式');
 assert.ok(checkout.includes('id="discountCode"'), '結帳頁必須提供折扣碼欄位');
-assert.ok(checkout.includes('discountedSubtotal >= 3000'), '宅配應以折扣後 3000 元判斷免運');
+assert.ok(checkout.includes('storeData.shipping_methods.find'), '結帳運費必須讀取後台物流設定');
+assert.ok(checkout.includes("f.product_type === 'combo'"), '組合規格必須獨立顯示');
+assert.ok(checkout.includes('StorefrontData.calculateDiscount'), '結帳折扣必須使用共用後台資料計算');
+assert.ok(storefront.includes("image_url:p.img || p.image_url || ''"), '購物車商品快照必須保留前台實際顯示圖片');
+assert.ok(checkout.includes('const imageSource = f.image_url ||'), '結帳商品圖片必須優先使用後台或前台快照圖片');
+const paymentPanel = checkout.match(/<section class="panel payment-panel"[\s\S]*?<\/section>/)?.[0] || '';
+const discountPanel = checkout.match(/<section class="panel discount-panel"[\s\S]*?<\/section>/)?.[0] || '';
+const notePanel = checkout.match(/<section class="panel note-panel"[\s\S]*?<\/section>/)?.[0] || '';
+assert.ok(paymentPanel.includes('id="payment-title"') && !paymentPanel.includes('id="discountCode"'), '付款方式必須是獨立卡片');
+assert.ok(discountPanel.includes('id="discountCode"') && !discountPanel.includes('id="note"'), '折扣碼必須是獨立卡片');
+assert.ok(notePanel.includes('id="note"'), '訂單備註必須是獨立卡片');
+assert.ok(checkout.includes('width: min(1100px, calc(100% - 40px));\n  margin-inline: auto;'), '結帳雙欄版面必須水平置中');
 
 const staticIds = new Set([...html.matchAll(/id="([^"]+)"/g)].map(match => match[1]));
 const referencedIds = new Set([...app.matchAll(/\$\('#([^']+)'\)/g)].map(match => match[1]));
