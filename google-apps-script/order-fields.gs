@@ -59,9 +59,15 @@ function handleOrderWebhook(e, request) {
 
   var order = request.order;
   var spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
-  var sheet = spreadsheet.getSheets().find(function(candidate) {
+  var sheets = spreadsheet ? spreadsheet.getSheets() : [];
+  var sheet = sheets.find(function(candidate) {
     return typeof SHEET_GID !== 'undefined' && candidate.getSheetId() === Number(SHEET_GID);
-  }) || spreadsheet.getSheetByName('訂單');
+  }) || (spreadsheet && spreadsheet.getSheetByName('訂單')) || sheets.find(function(candidate) {
+    var lastColumn = candidate.getLastColumn();
+    if (!lastColumn) return false;
+    var headers = candidate.getRange(1, 1, 1, lastColumn).getDisplayValues()[0];
+    return headers.indexOf('訂單編號') !== -1;
+  }) || sheets[0];
   if (!sheet) return ContentService.createTextOutput('Order sheet not found');
 
   var values = sheet.getDataRange().getValues();

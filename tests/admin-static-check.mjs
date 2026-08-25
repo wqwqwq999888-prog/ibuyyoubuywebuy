@@ -55,8 +55,11 @@ assert.ok(!checkout.includes('script.google.com/macros'), '結帳前端不得直
 assert.ok(migration.includes("'已匯款待確認'") && migration.includes("'已完成'"), 'migration 必須限制付款與出貨狀態');
 assert.ok(reconcileMigration.includes('add column if not exists') && reconcileMigration.includes('pending_ecpay_orders'), '既有部分 schema 必須能安全補齊');
 const statusSync = readFileSync(new URL('../netlify/functions/order-status-sync.js', import.meta.url), 'utf8');
+const orderCreate = readFileSync(new URL('../netlify/functions/order-create.js', import.meta.url), 'utf8');
 const sheetScript = readFileSync(new URL('../google-apps-script/order-fields.gs', import.meta.url), 'utf8');
 assert.ok(sheetScript.includes("request.action === 'upsertOrder'") && sheetScript.includes('notifyNewServerOrder_'), '只有正式新建訂單可寄送確認信');
+assert.ok(sheetScript.includes("headers.indexOf('訂單編號')") && sheetScript.includes('sheets[0]'), 'Apps Script 必須能辨識既有訂單工作表');
+assert.ok(orderCreate.includes('const existing = await supabase') && orderCreate.includes('sheetSynced'), '銀行匯款建單重試不可重複建立訂單，Sheet 失敗不可誤報訂單失敗');
 assert.ok(statusSync.includes('event.headers.Authorization'), 'Netlify 管理員驗證必須兼容 Authorization header 大小寫');
 assert.ok(orderHelper.includes("responseText !== 'OK'"), 'Google Sheet webhook 必須檢查 Apps Script 回應內容');
 assert.ok(orderHelper.includes("apikey: SUPABASE_KEY") && !orderHelper.includes('Bearer ${SUPABASE_KEY}'), 'sb_secret_ 只能作為 apikey');
