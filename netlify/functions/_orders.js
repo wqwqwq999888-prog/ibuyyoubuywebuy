@@ -52,7 +52,8 @@ async function syncSheet(order, action = 'upsertOrder') {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ action, order })
   });
-  if (!response.ok) throw new Error(`Google Sheet sync ${response.status}`);
+  const responseText = (await response.text()).trim();
+  if (!response.ok || responseText !== 'OK') throw new Error(`Google Sheet sync ${response.status}: ${responseText}`);
 }
 
 module.exports = { supabase, normalizeOrder, addProductCosts, syncSheet };
