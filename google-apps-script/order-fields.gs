@@ -81,6 +81,43 @@ function handleOrderWebhook(e, request) {
     order.partner_name || '', order.gross_profit
   ];
   if (rowIndex > 0) sheet.getRange(rowIndex + 1, 1, 1, 24).setValues([row]);
-  else sheet.appendRow(row);
+  else {
+    sheet.appendRow(row);
+    // 只有正式新建訂單寄信；後台 updateStatus 不得重複寄送確認信。
+    if (request.action === 'upsertOrder') notifyNewServerOrder_(order, itemsText);
+  }
   return ContentService.createTextOutput('OK');
+}
+
+function notifyNewServerOrder_(order, itemsText) {
+  var shippingMap = {'711':'7-11超商取貨','family':'全家超商取貨','kuroneko':'黑貓宅配'};
+  var details = order.shipping_details || {};
+  var emailItemsText = (order.items || []).map(function(item) {
+    return (item.name || '商品') + ' x ' + Number(item.qty || 0) + ' 包';
+  }).join('\n') || itemsText;
+  var deliveryInfo = order.shipping_method === '711' ? '7-11：' + (details.store711 || '') :
+    order.shipping_method === 'family' ? '全家：' + (details.storefamily || '') :
+    [details.city || '', details.address || ''].join('');
+  var paymentInstruction = order.payment_method === 'bank' ?
+    '付款方式：銀行匯款\n台灣銀行 (004)\n戶名：蕭百芳\n帳號：0000049004971344\n\n您填寫的轉帳後五碼：' + (order.transfer_last_five || '') :
+    '付款方式：信用卡（已付款）';
+  var fulfillmentMessage = order.payment_method === 'bank' ?
+    '確認收款後，我們將盡快備貨出貨！' :
+    '付款已完成，我們將盡快備貨出貨！';
+  var customerBody = '親愛的 ' + order.customer_name + ' 您好，\n\n' +
+    '感謝您訂購鬥陣買肉乾！以下是您的訂單資訊：\n\n' +
+    '訂單編號：' + order.order_no + '\n\n' +
+    '─── 訂購明細 ───\n' + emailItemsText + '\n' +
+    '總金額：NT$ ' + order.order_amount + '（含運費 NT$ ' + order.shipping_fee + '）\n\n' +
+    '─── 配送方式 ───\n' + (shippingMap[order.shipping_method] || order.shipping_method) + '\n' + deliveryInfo + '\n\n' +
+    '─── 付款資訊 ───\n' + paymentInstruction + '\n\n' +
+    fulfillmentMessage + '\n\n' +
+    '如有任何問題，歡迎加入我們的官方 LINE 聯絡：\nhttps://lin.ee/wvbqdo7\n\n' +
+    '謝謝您的支持，期待與您鬥陣買！\n鬥陣買肉乾 敬上';
+  var ownerBody = '新訂單：' + order.order_no + '\n客戶：' + order.customer_name +
+    '\n電話：' + order.customer_phone + '\nEmail：' + order.customer_email +
+    '\n商品：' + itemsText + '\n總額：NT$ ' + order.order_amount +
+    '\n付款狀態：' + order.payment_status + '\n出貨狀態：' + order.shipping_status;
+  GmailApp.sendEmail(NOTIFY_EMAIL, '新訂單！' + order.customer_name + ' NT$' + order.order_amount + '－鬥陣買肉乾', ownerBody, {name:'鬥陣買肉乾'});
+  if (order.customer_email) GmailApp.sendEmail(order.customer_email, '【鬥陣買肉乾】訂單確認 － ' + order.order_no, customerBody, {name:'鬥陣買肉乾'});
 }
