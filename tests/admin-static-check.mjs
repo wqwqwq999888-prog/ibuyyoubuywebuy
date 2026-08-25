@@ -44,6 +44,10 @@ assert.ok(checkout.includes('id="emailMarketingConsent"') && checkout.includes('
 assert.ok(checkout.includes('/.netlify/functions/order-create'), '銀行匯款必須透過 server endpoint 建立訂單');
 assert.match(checkout, /<div class="payment-options">[\s\S]*?<\/div>\s*<\/div>\s*<!-- 折扣碼 -->/, '付款方式、折扣碼必須是獨立 panel');
 assert.match(checkout, /<!-- 折扣碼 -->[\s\S]*?<\/div>\s*<!-- 備註 -->\s*<div class="panel">/, '折扣碼、訂單備註必須是獨立 panel');
+assert.ok(checkout.includes('class="discount-entry"'), '折扣碼輸入框必須使用深色結帳頁樣式');
+assert.ok(html.includes('id="monthSales"') && html.includes('id="yearProfit"'), '訂單後台必須提供月／年銷售及淨利統計');
+assert.ok(app.includes("payment_status==='已付款'") && app.includes('renderOrderSummary'), '營運統計只能計入已付款訂單');
+assert.ok(orderHelper.includes('addProductCosts') && checkout.includes('productNo:'), '正式訂單必須依商品後台成本計算毛利');
 assert.ok(!checkout.includes('script.google.com/macros'), '結帳前端不得直接寫入 Google Sheet');
 assert.ok(migration.includes("'已匯款待確認'") && migration.includes("'已完成'"), 'migration 必須限制付款與出貨狀態');
 assert.ok(orderHelper.includes("apikey: SUPABASE_KEY") && !orderHelper.includes('Bearer ${SUPABASE_KEY}'), 'sb_secret_ 只能作為 apikey');

@@ -99,6 +99,13 @@ nav {
   padding-right: 36px; cursor: pointer;
 }
 .field input:focus, .field select:focus, .field textarea:focus { border-color: var(--gold); }
+.discount-entry { display:flex; gap:10px; }
+.discount-entry input {
+  flex:1; min-width:0; background:var(--dark3); color:var(--text);
+  border:1px solid var(--dark4); padding:12px 14px; outline:none;
+}
+.discount-entry input::placeholder { color:var(--text-dim); }
+.discount-entry input:focus { border-color:var(--gold); }
 .field input.error, .field select.error { border-color: var(--red); }
 .field .hint { font-size: 11px; color: var(--text-dim); }
 .field .err-msg { font-size: 11px; color: var(--red); display: none; }
@@ -448,7 +455,7 @@ nav {
     <!-- 折扣碼 -->
     <div class="panel">
       <div class="panel-title">🏷️ 折扣碼 <span>選填</span></div>
-      <div style="display:flex;gap:10px"><input type="text" id="discountCode" placeholder="請輸入折扣碼" style="flex:1;text-transform:uppercase"><button type="button" onclick="applyDiscountCode()" style="padding:12px 18px;border:0;border-radius:4px;background:var(--gold);color:var(--dark);font-weight:700;cursor:pointer">套用</button></div>
+      <div class="discount-entry"><input type="text" id="discountCode" placeholder="請輸入折扣碼" style="text-transform:uppercase"><button type="button" onclick="applyDiscountCode()" style="padding:12px 18px;border:0;border-radius:4px;background:var(--gold);color:var(--dark);font-weight:700;cursor:pointer">套用</button></div>
       <p id="discountMessage" style="margin:8px 0 0;font-size:12px;color:var(--text-dim)"></p>
     </div>
 
@@ -908,6 +915,7 @@ async function submitOrder() {
     transfer5: document.getElementById('transfer5b')?.value || document.getElementById('transfer5')?.value || '',
     transferTime: document.getElementById('transferTime')?.value || '',
     items: Object.keys(cart).filter(k => cart[k] > 0).map(k => ({
+      productNo: `${Number(k) < 8 ? '10000' : '20000'}${Number(k) < 8 ? Number(k) + 1 : Number(k) - 7}`,
       name: FLAVORS_DATA[k].name,
       price: FLAVORS_DATA[k].price,
       qty: cart[k]
@@ -1173,6 +1181,7 @@ function showToast(msg) {
     payment: 'credit',
     note: document.getElementById('note')?.value || '',
     items: Object.keys(cart).filter(k => cart[k] > 0).map(k => ({
+      productNo: `${Number(k) < 8 ? '10000' : '20000'}${Number(k) < 8 ? Number(k) + 1 : Number(k) - 7}`,
       name: FLAVORS_DATA[parseInt(k)].name,
       price: FLAVORS_DATA[parseInt(k)].price,
       qty: cart[k]

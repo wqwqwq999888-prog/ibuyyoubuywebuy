@@ -1,5 +1,5 @@
 const crypto = require('crypto');
-const { supabase, normalizeOrder, syncSheet } = require('./_orders');
+const { supabase, normalizeOrder, addProductCosts, syncSheet } = require('./_orders');
 
 exports.handler = async (event) => {
   if (event.httpMethod !== 'POST') {
@@ -38,7 +38,7 @@ exports.handler = async (event) => {
     try {
       const pending = await supabase(`pending_ecpay_orders?order_no=eq.${encodeURIComponent(orderId)}&select=*`);
       if (!pending.length || Number(params.TradeAmt) !== pending[0].expected_amount) return { statusCode: 200, body: '0|AmountError' };
-      const order = normalizeOrder({ ...pending[0].payload, tradeNo: params.TradeNo }, '已付款');
+      const order = await addProductCosts(normalizeOrder({ ...pending[0].payload, tradeNo: params.TradeNo }, '已付款'));
       const created = await supabase('orders?on_conflict=order_no', { method: 'POST', headers: { Prefer: 'resolution=ignore-duplicates,return=representation' }, body: JSON.stringify(order) });
       if (created.length) await syncSheet(created[0]);
       await supabase(`pending_ecpay_orders?order_no=eq.${encodeURIComponent(orderId)}`, { method: 'DELETE' });

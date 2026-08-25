@@ -35,6 +35,15 @@ function normalizeOrder(data, paymentStatus) {
   };
 }
 
+async function addProductCosts(order) {
+  const productNos = [...new Set(order.items.map(item => String(item.productNo || '')).filter(Boolean))];
+  if (!productNos.length) return order;
+  const products = await supabase(`products?product_no=in.(${productNos.map(encodeURIComponent).join(',')})&select=product_no,cost`);
+  const costs = Object.fromEntries(products.map(product => [String(product.product_no), Number(product.cost || 0)]));
+  order.product_cost = order.items.reduce((total, item) => total + (costs[String(item.productNo)] || 0) * Number(item.qty || 0), 0);
+  return order;
+}
+
 async function syncSheet(order, action = 'upsertOrder') {
   if (!process.env.GOOGLE_SHEET_WEBHOOK_URL) return;
   const url = new URL(process.env.GOOGLE_SHEET_WEBHOOK_URL);
@@ -46,4 +55,4 @@ async function syncSheet(order, action = 'upsertOrder') {
   if (!response.ok) throw new Error(`Google Sheet sync ${response.status}`);
 }
 
-module.exports = { supabase, normalizeOrder, syncSheet };
+module.exports = { supabase, normalizeOrder, addProductCosts, syncSheet };

@@ -114,6 +114,16 @@
       </section>
 
       <section id="ordersPage" class="page">
+        <div class="order-report-toolbar">
+          <label>統計月份 <input id="orderReportMonth" type="month"></label>
+          <span>銷售額與淨利只計入付款狀態為「已付款」的訂單。</span>
+        </div>
+        <div class="summary-grid order-summary-grid">
+          <article class="summary-card"><span>本月銷售額</span><strong id="monthSales">NT$ 0</strong><small id="monthPaidOrders">0 筆已付款</small></article>
+          <article class="summary-card"><span>本月淨利</span><strong id="monthProfit">NT$ 0</strong><small>銷售額扣除運費與商品成本</small></article>
+          <article class="summary-card"><span>本年銷售額</span><strong id="yearSales">NT$ 0</strong><small id="yearPaidOrders">0 筆已付款</small></article>
+          <article class="summary-card"><span>本年淨利</span><strong id="yearProfit">NT$ 0</strong><small>依商品後台成本計算</small></article>
+        </div>
         <div class="panel">
           <div class="panel-toolbar"><div><h2>訂單清單</h2><p>Supabase 為主資料；狀態異動會由伺服器同步至 Google Sheet。</p></div><button id="chooseOrderColumns" class="secondary-button" type="button">選擇顯示欄位</button></div>
           <div id="orderColumnPicker" class="column-picker hidden"></div>

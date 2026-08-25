@@ -214,6 +214,22 @@ function renderOrders() {
   $('#orderRows').innerHTML=(state.data.orders||[]).map(order=>`<tr>${columns.map(([key])=>`<td>${orderCell(order,key)}</td>`).join('')}</tr>`).join('');
   $('#orderEmpty').classList.toggle('hidden',(state.data.orders||[]).length>0);
   $('#orderColumnPicker').innerHTML=ORDER_COLUMNS.map(([key,label])=>`<label><input type="checkbox" value="${key}" ${visible.includes(key)?'checked':''}> ${label}</label>`).join('');
+  renderOrderSummary();
+}
+function renderOrderSummary() {
+  const now=new Date();
+  if(!$('#orderReportMonth').value) $('#orderReportMonth').value=`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
+  const [year,month]=$('#orderReportMonth').value.split('-').map(Number);
+  const paid=(state.data.orders||[]).filter(order=>order.payment_status==='已付款');
+  const inYear=paid.filter(order=>new Date(order.created_at).getFullYear()===year);
+  const inMonth=inYear.filter(order=>new Date(order.created_at).getMonth()+1===month);
+  const sum=(orders,key)=>orders.reduce((total,order)=>total+Number(order[key]||0),0);
+  $('#monthSales').textContent=money(sum(inMonth,'order_amount'));
+  $('#monthProfit').textContent=money(sum(inMonth,'gross_profit'));
+  $('#yearSales').textContent=money(sum(inYear,'order_amount'));
+  $('#yearProfit').textContent=money(sum(inYear,'gross_profit'));
+  $('#monthPaidOrders').textContent=`${inMonth.length} 筆已付款`;
+  $('#yearPaidOrders').textContent=`${inYear.length} 筆已付款`;
 }
 
 function renderAll() { renderProducts(); renderShipping(); renderDiscounts(); renderCampaigns(); renderOrders(); setPage(state.page); }
@@ -311,6 +327,7 @@ document.addEventListener('click', async event => {
 });
 
 $('#chooseOrderColumns').addEventListener('click',()=>$('#orderColumnPicker').classList.toggle('hidden'));
+$('#orderReportMonth').addEventListener('change',renderOrderSummary);
 $('#orderColumnPicker').addEventListener('change',()=>{const values=[...$('#orderColumnPicker').querySelectorAll(':checked')].map(i=>i.value);if(!values.length)return toast('至少保留一個欄位');localStorage.setItem(ORDER_COLUMN_KEY,JSON.stringify(values));renderOrders();});
 $('#orderRows').addEventListener('change',async event=>{if(!event.target.matches('.order-status'))return;const order=state.data.orders.find(o=>o.order_no===event.target.dataset.order);if(!order)return;const body={orderNo:order.order_no,paymentStatus:event.target.dataset.kind==='payment'?event.target.value:order.payment_status,shippingStatus:event.target.dataset.kind==='shipping'?event.target.value:order.shipping_status};setSaving(true);try{const response=await fetch('/.netlify/functions/order-status-sync',{method:'POST',headers:{'Content-Type':'application/json',Authorization:`Bearer ${state.token}`},body:JSON.stringify(body)});if(!response.ok)throw new Error((await response.json()).error);state.data=await cloudLoad();renderOrders();toast('訂單與試算表已同步');}catch(error){renderOrders();toast(error.message||'狀態更新失敗');}finally{setSaving(false);}});
 
