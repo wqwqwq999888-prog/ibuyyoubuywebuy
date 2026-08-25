@@ -33,6 +33,7 @@
         <button class="nav-item" data-page="shipping"><span>02</span>物流管理</button>
         <button class="nav-item" data-page="discounts"><span>03</span>折扣管理</button>
         <button class="nav-item" data-page="campaigns"><span>04</span>團購管理</button>
+        <button class="nav-item" data-page="orders"><span>05</span>訂單管理</button>
       </nav>
       <div class="sidebar-footer">
         <span id="modeBadge" class="mode-badge">本地模式</span>
@@ -109,6 +110,15 @@
           <div class="panel-heading"><div><h2>團購活動</h2><p>每位團購主使用一組專屬折扣碼，並取得唯讀月報表連結。</p></div></div>
           <div class="table-wrap"><table><thead><tr><th>活動／團主</th><th>專屬折扣碼</th><th>活動期間</th><th>團購主報表</th><th>狀態</th><th></th></tr></thead><tbody id="campaignRows"></tbody></table></div>
           <div id="campaignEmpty" class="empty-state hidden">還沒有團購活動。</div>
+        </div>
+      </section>
+
+      <section id="ordersPage" class="page">
+        <div class="panel">
+          <div class="panel-toolbar"><div><h2>訂單清單</h2><p>Supabase 為主資料；狀態異動會由伺服器同步至 Google Sheet。</p></div><button id="chooseOrderColumns" class="secondary-button" type="button">選擇顯示欄位</button></div>
+          <div id="orderColumnPicker" class="column-picker hidden"></div>
+          <div class="table-wrap"><table><thead id="orderHead"></thead><tbody id="orderRows"></tbody></table></div>
+          <div id="orderEmpty" class="empty-state hidden">目前沒有正式訂單。</div>
         </div>
       </section>
     </main>

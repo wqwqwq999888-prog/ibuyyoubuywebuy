@@ -311,6 +311,10 @@ nav {
             <span class="err-msg">請填寫有效的 Email</span>
           </div>
         </div>
+        <label style="display:flex;gap:10px;align-items:flex-start;color:var(--text-dim);font-size:13px;line-height:1.6">
+          <input type="checkbox" id="emailMarketingConsent" style="width:auto;margin-top:4px">
+          我願意收到新品與優惠 Email（選填，預設不勾選；不影響訂單通知）
+        </label>
       </div>
     </div>
 
@@ -888,6 +892,7 @@ async function submitOrder() {
       phone: document.getElementById('phone').value.trim(),
       email: document.getElementById('email').value.trim(),
     },
+    emailMarketingConsent: document.getElementById('emailMarketingConsent').checked,
    shipping: {
       method: selectedShipping,
       store711: document.getElementById('store711')?.value || '',
@@ -915,19 +920,14 @@ async function submitOrder() {
     total: Math.max(0, getSubtotal() - discountAmount) + shippingFee,
   };
 
-  // 1. 送訂單到 Apps Script（寫試算表 + 寄信給你和客人）
-const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwRwtyxF3-EdHy9nT_7ZOn_LLoRPqw-Pf3vTY4m0yISa1YM2tiCSgdpWoLXghAeMo643w/exec';
-  try {
-    const payload = JSON.stringify(orderData);
-    fetch(APPS_SCRIPT_URL + '?data=' + encodeURIComponent(payload), {
-      method: 'GET',
-      mode: 'no-cors'
-    }).catch(e => console.log('Apps Script 送出:', e));
-  } catch(e) { console.log('Apps Script 錯誤:', e); }
-
-  // 2. 判斷付款方式
+  // 銀行匯款完成並填妥資料後，才由伺服器建立正式訂單。
   if (orderData.payment === 'bank') {
-    // 銀行匯款：直接顯示成功頁
+    try {
+      const response = await fetch('/.netlify/functions/order-create', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(orderData) });
+      if (!response.ok) throw new Error((await response.json()).error || '訂單建立失敗');
+    } catch (error) {
+      btn.disabled = false; btn.textContent = '確認下單 ✓'; showToast(error.message); return;
+    }
     sessionStorage.removeItem('cart');
     sessionStorage.removeItem('checkoutFormData');
     showSuccess(orderData);
@@ -970,7 +970,7 @@ const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwRwtyxF3-EdHy9
     const res = await fetch('/.netlify/functions/ecpay-checkout', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(params)
+      body: JSON.stringify({ params, order: { ...orderData, orderId: params.MerchantTradeNo } })
     });
     const data = await res.json();
     params.CheckMacValue = data.CheckMacValue;
@@ -1159,6 +1159,7 @@ function showToast(msg) {
       phone: document.getElementById('phone').value.trim(),
       email: document.getElementById('email').value.trim(),
     },
+    emailMarketingConsent: document.getElementById('emailMarketingConsent').checked,
   shipping: {
       method: selectedShipping,
       store711: document.getElementById('store711')?.value || '',
@@ -1185,11 +1186,6 @@ function showToast(msg) {
     transfer5: '',
     transferTime: '',
   };
-  const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwRwtyxF3-EdHy9nT_7ZOn_LLoRPqw-Pf3vTY4m0yISa1YM2tiCSgdpWoLXghAeMo643w/exec';
-  fetch(APPS_SCRIPT_URL + '?data=' + encodeURIComponent(JSON.stringify(orderData)), {
-    method: 'GET', mode: 'no-cors'
-  }).catch(e => console.log('Apps Script 錯誤:', e));  
-
   const params = {
     MerchantID: '3504484',
     MerchantTradeNo: merchantTradeNo,
@@ -1209,7 +1205,7 @@ function showToast(msg) {
     const res = await fetch('/.netlify/functions/ecpay-checkout', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(params)
+      body: JSON.stringify({ params, order: orderData })
     });
     const data = await res.json();
     params.CheckMacValue = data.CheckMacValue;
