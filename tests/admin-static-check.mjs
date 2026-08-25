@@ -42,6 +42,8 @@ assert.ok(html.includes('訂單管理') && app.includes('ORDER_COLUMNS'), '後�
 assert.equal((app.match(/\['[^']+','[^']+'\]/g) || []).filter(value => ORDER_COLUMN_NAMES.some(name => value.includes(`'${name}'`))).length, 24, '訂單欄位必須是 24 欄');
 assert.ok(checkout.includes('id="emailMarketingConsent"') && checkout.includes('emailMarketingConsent').valueOf(), 'Email 行銷同意必須獨立存在');
 assert.ok(checkout.includes('/.netlify/functions/order-create'), '銀行匯款必須透過 server endpoint 建立訂單');
+assert.match(checkout, /<div class="payment-options">[\s\S]*?<\/div>\s*<\/div>\s*<!-- 折扣碼 -->/, '付款方式、折扣碼必須是獨立 panel');
+assert.match(checkout, /<!-- 折扣碼 -->[\s\S]*?<\/div>\s*<!-- 備註 -->\s*<div class="panel">/, '折扣碼、訂單備註必須是獨立 panel');
 assert.ok(!checkout.includes('script.google.com/macros'), '結帳前端不得直接寫入 Google Sheet');
 assert.ok(migration.includes("'已匯款待確認'") && migration.includes("'已完成'"), 'migration 必須限制付款與出貨狀態');
 assert.ok(orderHelper.includes("apikey: SUPABASE_KEY") && !orderHelper.includes('Bearer ${SUPABASE_KEY}'), 'sb_secret_ 只能作為 apikey');
