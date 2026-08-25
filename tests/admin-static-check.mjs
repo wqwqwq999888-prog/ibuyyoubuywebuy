@@ -36,6 +36,7 @@ console.log('Admin static checks passed.');
 
 const ORDER_COLUMN_NAMES = ['created_at','order_no','customer_name','customer_phone','customer_email','items','order_amount','shipping_method','shipping_details','transfer_last_five','transfer_time','note','payment_status','shipping_status','trade_no','shipped_at','completed_at','product_cost','product_amount','discount_amount','shipping_fee','discount_code','partner_name','gross_profit'];
 const migration = readFileSync(new URL('../supabase/migrations/20260825000000_order_management.sql', import.meta.url), 'utf8');
+const reconcileMigration = readFileSync(new URL('../supabase/migrations/20260825020000_reconcile_order_columns.sql', import.meta.url), 'utf8');
 const orderHelper = readFileSync(new URL('../netlify/functions/_orders.js', import.meta.url), 'utf8');
 const ecpayReturn = readFileSync(new URL('../netlify/functions/ecpay-return.js', import.meta.url), 'utf8');
 assert.ok(html.includes('訂單管理') && app.includes('ORDER_COLUMNS'), '後台必須提供 24 欄訂單管理');
@@ -52,5 +53,6 @@ assert.ok(app.includes("payment_status==='已付款'") && app.includes('renderOr
 assert.ok(orderHelper.includes('addProductCosts') && checkout.includes('productNo:'), '正式訂單必須依商品後台成本計算毛利');
 assert.ok(!checkout.includes('script.google.com/macros'), '結帳前端不得直接寫入 Google Sheet');
 assert.ok(migration.includes("'已匯款待確認'") && migration.includes("'已完成'"), 'migration 必須限制付款與出貨狀態');
+assert.ok(reconcileMigration.includes('add column if not exists') && reconcileMigration.includes('pending_ecpay_orders'), '既有部分 schema 必須能安全補齊');
 assert.ok(orderHelper.includes("apikey: SUPABASE_KEY") && !orderHelper.includes('Bearer ${SUPABASE_KEY}'), 'sb_secret_ 只能作為 apikey');
 assert.ok(ecpayReturn.includes("params.RtnCode === '1'") && ecpayReturn.includes('expected_amount'), '綠界成功及金額驗證後才可建立訂單');
