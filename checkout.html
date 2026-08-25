@@ -319,8 +319,8 @@ nav {
           </div>
         </div>
         <label style="display:flex;gap:10px;align-items:flex-start;color:var(--text-dim);font-size:13px;line-height:1.6">
-          <input type="checkbox" id="emailMarketingConsent" style="width:auto;margin-top:4px">
-          我願意收到新品與優惠 Email（選填，預設不勾選；不影響訂單通知）
+          <input type="checkbox" id="emailMarketingConsent" autocomplete="off" style="width:auto;margin-top:4px">
+          我願意收到新品與優惠 Email
         </label>
       </div>
     </div>
@@ -679,6 +679,8 @@ let discountAmount = 0;
 
   // 頁面載入時：先回填、再綁定監聽
   window.addEventListener('DOMContentLoaded', () => {
+    // 行銷同意每次進入結帳都必須由客戶主動選擇，不沿用瀏覽器上次的勾選狀態。
+    document.getElementById('emailMarketingConsent').checked = false;
     setTimeout(() => {
       loadFormData();
       bindAutoSave();

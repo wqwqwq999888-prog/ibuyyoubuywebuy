@@ -41,6 +41,8 @@ const ecpayReturn = readFileSync(new URL('../netlify/functions/ecpay-return.js',
 assert.ok(html.includes('訂單管理') && app.includes('ORDER_COLUMNS'), '後台必須提供 24 欄訂單管理');
 assert.equal((app.match(/\['[^']+','[^']+'\]/g) || []).filter(value => ORDER_COLUMN_NAMES.some(name => value.includes(`'${name}'`))).length, 24, '訂單欄位必須是 24 欄');
 assert.ok(checkout.includes('id="emailMarketingConsent"') && checkout.includes('emailMarketingConsent').valueOf(), 'Email 行銷同意必須獨立存在');
+assert.ok(!checkout.includes('選填，預設不勾選；不影響訂單通知'), '行銷同意旁不應顯示冗長的內部規則說明');
+assert.match(checkout, /emailMarketingConsent'\)\.checked = false/, 'Email 行銷同意每次進入結帳必須預設不勾選');
 assert.ok(checkout.includes('/.netlify/functions/order-create'), '銀行匯款必須透過 server endpoint 建立訂單');
 assert.match(checkout, /<div class="payment-options">[\s\S]*?<\/div>\s*<\/div>\s*<!-- 折扣碼 -->/, '付款方式、折扣碼必須是獨立 panel');
 assert.match(checkout, /<!-- 折扣碼 -->[\s\S]*?<\/div>\s*<!-- 備註 -->\s*<div class="panel">/, '折扣碼、訂單備註必須是獨立 panel');
