@@ -6,7 +6,8 @@ const json = (statusCode, body) => ({ statusCode, headers: { 'Content-Type': 'ap
 exports.handler = async event => {
   if (event.httpMethod !== 'POST') return json(405, { error: 'Method Not Allowed' });
   try {
-    const jwt = (event.headers.authorization || '').replace(/^Bearer\s+/i, '');
+    const authorization = event.headers.authorization || event.headers.Authorization || '';
+    const jwt = authorization.replace(/^Bearer\s+/i, '');
     if (!jwt || jwt.startsWith('sb_secret_')) return json(401, { error: '登入已過期，請重新登入' });
     const auth = await fetch(`${process.env.SUPABASE_URL}/auth/v1/user`, { headers: { apikey: process.env.SUPABASE_SECRET_KEY, Authorization: `Bearer ${jwt}` } });
     if (!auth.ok) return json(401, { error: '登入已過期，請重新登入' });
