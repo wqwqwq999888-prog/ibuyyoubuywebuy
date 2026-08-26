@@ -35,6 +35,9 @@ assert.ok(checkout.includes('id="orderLoading"') && checkout.includes("getElemen
 assert.ok(storefront.includes('/rest/v1/products?select=') && storefront.includes('&enabled=eq.true'), '前台必須讀取後台已上架商品');
 assert.ok(home.includes('applyStorefrontCatalog(await loadStorefrontCatalog())'), '首頁必須在繪製商品前同步雲端目錄');
 assert.ok(checkout.includes('applyCheckoutCatalog(await loadStorefrontCatalog(true))'), '結帳頁必須使用首頁同一份商品目錄快照');
+assert.ok(home.includes('function cartProduct(key)') && home.includes('const cartKey = c.product_no'), '首頁購物車必須以固定商品編號保存');
+assert.ok(checkout.includes('function checkoutProduct(key)') && checkout.includes("sessionStorage.setItem('cart', JSON.stringify(cart))"), '結帳頁必須依商品編號解析並遷移舊購物車');
+assert.ok(home.includes('function escapeStorefront(value)') && home.includes('escapeStorefront(f.description)'), '雲端商品文字輸出前必須轉義，且商品說明必須同步至詳情');
 
 const staticIds = new Set([...html.matchAll(/id="([^"]+)"/g)].map(match => match[1]));
 const referencedIds = new Set([...app.matchAll(/\$\('#([^']+)'\)/g)].map(match => match[1]));

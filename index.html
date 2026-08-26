@@ -757,6 +757,17 @@ const CART_PRODUCTS = FLAVORS.concat(COMBOS.map(c => ({
   img: c.img,
   unit: '組'
 })));
+CART_PRODUCTS.forEach((product, index) => {
+  product.product_no ||= `${index < 8 ? '10000' : '20000'}${index < 8 ? index + 1 : index - 7}`;
+});
+
+function cartProduct(key) {
+  return CART_PRODUCTS.find(product => product.product_no === String(key));
+}
+
+function escapeStorefront(value) {
+  return String(value ?? '').replace(/[&<>'"]/g, char => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', "'":'&#39;', '"':'&quot;' })[char]);
+}
 
 function imageSource(product, fallback) {
   return product.image_url || `data:image/jpeg;base64,${fallback.img}`;
@@ -786,7 +797,7 @@ function applyStorefrontCatalog(products) {
 function initCombo() {
   const tabsEl = document.getElementById('comboTabs');
   tabsEl.innerHTML = COMBOS.map((c, i) =>
-    `<button class="combo-tab${i === 0 ? ' active' : ''}" onclick="renderCombo(${i}, this)">${c.name}</button>`
+    `<button class="combo-tab${i === 0 ? ' active' : ''}" onclick="renderCombo(${i}, this)">${escapeStorefront(c.name)}</button>`
   ).join('');
   renderCombo(0);
 }
@@ -801,11 +812,11 @@ function renderCombo(idx, btn) {
   const flavorList = c.flavors.map(flavor => typeof flavor === 'number' ? FLAVORS[flavor]?.name : flavor).filter(Boolean).join('、');
   document.getElementById('comboShowcase').innerHTML = `
     <div class="combo-showcase-img-wrap">
-      <img class="combo-showcase-img" src="${c.imgSrc || `data:image/jpeg;base64,${c.img}`}" alt="${c.name}">
+      <img class="combo-showcase-img" src="${escapeStorefront(c.imgSrc || `data:image/jpeg;base64,${c.img}`)}" alt="${escapeStorefront(c.name)}">
     </div>
     <div class="combo-showcase-body">
-      <div class="combo-showcase-name">${c.name}</div>
-      <div class="combo-showcase-flavors">內含：${flavorList}</div>
+      <div class="combo-showcase-name">${escapeStorefront(c.name)}</div>
+      <div class="combo-showcase-flavors">內含：${escapeStorefront(flavorList)}</div>
       <div class="combo-showcase-price"><strong>NT$ ${c.price}</strong><span>／ 3包（每包200g）</span></div>
       <button class="combo-add-btn" onclick="addComboToCart(${idx})">加入購物車</button>
     </div>`;
@@ -824,11 +835,11 @@ function renderProducts(filter) {
     return `
     <div class="product-card" onclick="openModal(${FLAVORS.indexOf(f)})">
       <div class="product-img-wrap">
-        <img class="product-img" src="${f.imgSrc || `data:image/jpeg;base64,${f.img}`}" alt="${f.name}" loading="lazy">
+        <img class="product-img" src="${escapeStorefront(f.imgSrc || `data:image/jpeg;base64,${f.img}`)}" alt="${escapeStorefront(f.name)}" loading="lazy">
         <div class="product-tag ${isPremium ? 'premium' : ''}">${f.tag}</div>
       </div>
       <div class="product-info">
-        <div class="product-name">${f.name}</div>
+        <div class="product-name">${escapeStorefront(f.name)}</div>
         <div class="product-weight">豬肉條 · 200克</div>
       </div>
       <div class="product-footer">
@@ -852,12 +863,15 @@ function openModal(idx) {
   modalIdx = idx; modalQty = 1;
   const f = FLAVORS[idx];
   const m = document.getElementById('modalContent');
+  const details = f.description
+    ? `<p style="white-space:pre-line">${escapeStorefront(f.description)}</p>`
+    : `<h4>成分</h4><p>${escapeStorefront(f.ingredients)}</p><h4 style="margin-top:12px">食品添加物</h4><p>${escapeStorefront(f.additives)}</p><h4 style="margin-top:12px">過敏原資訊</h4><p>${escapeStorefront(f.allergens)}</p>`;
   m.innerHTML = `
-    <img class="modal-img" src="${f.imgSrc || `data:image/jpeg;base64,${f.img}`}" alt="${f.name}">
+    <img class="modal-img" src="${escapeStorefront(f.imgSrc || `data:image/jpeg;base64,${f.img}`)}" alt="${escapeStorefront(f.name)}">
     <div class="modal-body">
       <div class="modal-tag">${f.tag} · 豬肉條肉乾</div>
-      <div class="modal-name">${f.name}</div>
-      <div class="modal-product-name">品名：${f.product_name} | 規格：200克/包</div>
+      <div class="modal-name">${escapeStorefront(f.name)}</div>
+      <div class="modal-product-name">品名：${escapeStorefront(f.product_name || f.name)} | 規格：${escapeStorefront(f.specification || '200克/包')}</div>
       <div class="modal-price">NT$ ${f.price} <span style="font-size:14px;color:var(--text-dim)">/ 包</span></div>
       <div class="modal-qty">
         <label>數量</label>
@@ -869,12 +883,7 @@ function openModal(idx) {
       </div>
       <button class="modal-add-btn" onclick="addToCart(${idx}, modalQty); closeModalBtn()">加入購物車</button>
       <div class="modal-ingredients">
-        <h4>成分</h4>
-        <p>${f.ingredients}</p>
-        <h4 style="margin-top:12px">食品添加物</h4>
-        <p>${f.additives}</p>
-        <h4 style="margin-top:12px">過敏原資訊</h4>
-        <p>${f.allergens}</p>
+        ${details}
         <p style="margin-top:12px;color:var(--gold-dim)">保存：避免日光直射，拆封後冷藏盡快食用</p>
       </div>
     </div>`;
@@ -895,7 +904,8 @@ function closeModalBtn() {
 // ── CART ──
 function addToCart(idx, qty) {
   qty = parseInt(qty) || 1;
-  cart[idx] = (cart[idx] || 0) + qty;
+  const key = FLAVORS[idx].product_no;
+  cart[key] = (cart[key] || 0) + qty;
   updateCart();
   showToast(`已加入 ${FLAVORS[idx].name} × ${qty}`);
 }
@@ -903,7 +913,7 @@ function addToCart(idx, qty) {
 // 送禮組合：加入購物車時為「單一品項」（組合本身），不拆成內含的口味
 function addComboToCart(idx) {
   const c = COMBOS[idx];
-  const cartKey = FLAVORS.length + idx;
+  const cartKey = c.product_no;
   cart[cartKey] = (cart[cartKey] || 0) + 1;
   updateCart();
   showToast(`已加入「${c.name}」組合`);
@@ -917,7 +927,7 @@ function updateCart() {
   badge.style.display = total > 0 ? 'flex' : 'none';
   
   const itemsEl = document.getElementById('cartItems');
-  const keys = Object.keys(cart).filter(k => cart[k] > 0);
+  const keys = Object.keys(cart).filter(k => cart[k] > 0 && cartProduct(k));
   
   if(keys.length === 0) {
     itemsEl.innerHTML = '<div class="cart-empty">購物車是空的<br><span style="font-size:12px;color:var(--text-dim)">快去挑選你喜歡的口味吧！</span></div>';
@@ -928,24 +938,24 @@ function updateCart() {
   }
   
   itemsEl.innerHTML = keys.map(k => {
-    const f = CART_PRODUCTS[k];
+    const f = cartProduct(k);
     const q = cart[k];
     return `<div class="cart-item">
-      <img class="cart-item-img" src="${f.imgSrc || `data:image/jpeg;base64,${f.img}`}" alt="${f.name}">
+      <img class="cart-item-img" src="${escapeStorefront(f.imgSrc || `data:image/jpeg;base64,${f.img}`)}" alt="${escapeStorefront(f.name)}">
       <div style="flex:1">
-        <div class="cart-item-name">${f.name}</div>
+        <div class="cart-item-name">${escapeStorefront(f.name)}</div>
         <div class="cart-item-price">NT$ ${f.price} / ${f.unit || '包'}</div>
         <div class="cart-item-controls">
-          <button class="qty-btn" onclick="setCartQty(${k}, ${q-1})">−</button>
-          <input class="qty-input" type="number" value="${q}" min="1" max="99" onchange="setCartQty(${k}, this.value)">
-          <button class="qty-btn" onclick="setCartQty(${k}, ${q+1})">+</button>
+          <button class="qty-btn" onclick="setCartQty('${k}', ${q-1})">−</button>
+          <input class="qty-input" type="number" value="${q}" min="1" max="99" onchange="setCartQty('${k}', this.value)">
+          <button class="qty-btn" onclick="setCartQty('${k}', ${q+1})">+</button>
         </div>
       </div>
-      <button class="cart-remove" onclick="removeCart(${k})">✕</button>
+      <button class="cart-remove" onclick="removeCart('${k}')">✕</button>
     </div>`;
   }).join('');
   
-  const subtotal = keys.reduce((a, k) => a + CART_PRODUCTS[k].price * cart[k], 0);
+  const subtotal = keys.reduce((a, k) => a + cartProduct(k).price * cart[k], 0);
   const shipping = subtotal >= 1500 ? 0 : 65;
   
   const freeLeft = 1500 - subtotal;

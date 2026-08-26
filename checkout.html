@@ -620,6 +620,13 @@ CHECKOUT_COMBOS.forEach(c => {
     FLAVOR_IMGS[c.name] = FLAVOR_IMGS[fallback.name];
   }
 });
+FLAVORS_DATA.forEach((product, index) => {
+  product.product_no ||= `${index < 8 ? '10000' : '20000'}${index < 8 ? index + 1 : index - 7}`;
+});
+
+function checkoutProduct(key) {
+  return FLAVORS_DATA.find(product => product.product_no === String(key));
+}
 
 function applyCheckoutCatalog(products) {
   if (!products) return;
@@ -729,6 +736,14 @@ function loadCart() {
   const saved = sessionStorage.getItem('cart');
   if (!saved) { cart = {}; }
   else { cart = JSON.parse(saved); }
+  // 舊版購物車以陣列索引為 key；讀取時一次轉為不受排序影響的固定商品編號。
+  const migrated = {};
+  Object.entries(cart).forEach(([key, qty]) => {
+    const product = checkoutProduct(key) || (/^\d{1,2}$/.test(key) ? FLAVORS_DATA[Number(key)] : null);
+    if (product && qty > 0) migrated[product.product_no] = (migrated[product.product_no] || 0) + Number(qty);
+  });
+  cart = migrated;
+  sessionStorage.setItem('cart', JSON.stringify(cart));
 
   const hasItems = Object.keys(cart).some(k => cart[k] > 0);
   if (!hasItems) {
@@ -740,10 +755,10 @@ function loadCart() {
 }
 
 function renderOrderSummary() {
-  const keys = Object.keys(cart).filter(k => cart[k] > 0);
+  const keys = Object.keys(cart).filter(k => cart[k] > 0 && checkoutProduct(k));
   let subtotal = 0;
   const html = keys.map(k => {
-const f = FLAVORS_DATA[parseInt(k)];
+    const f = checkoutProduct(k);
     const qty = cart[k];
     subtotal += f.price * qty;
     return `<div class="order-item">
@@ -776,7 +791,7 @@ const f = FLAVORS_DATA[parseInt(k)];
 
 function getSubtotal() {
   return Object.keys(cart).filter(k => cart[k] > 0)
-    .reduce((a, k) => a + FLAVORS_DATA[k].price * cart[k], 0);
+    .reduce((a, k) => a + (checkoutProduct(k)?.price || 0) * cart[k], 0);
 }
 
 function getAvailableDiscounts() {
@@ -957,9 +972,9 @@ async function submitOrder() {
     transfer5: document.getElementById('transfer5b')?.value || document.getElementById('transfer5')?.value || '',
     transferTime: document.getElementById('transferTime')?.value || '',
     items: Object.keys(cart).filter(k => cart[k] > 0).map(k => ({
-      productNo: FLAVORS_DATA[k].product_no || `${Number(k) < 8 ? '10000' : '20000'}${Number(k) < 8 ? Number(k) + 1 : Number(k) - 7}`,
-      name: FLAVORS_DATA[k].name,
-      price: FLAVORS_DATA[k].price,
+      productNo: checkoutProduct(k).product_no,
+      name: checkoutProduct(k).name,
+      price: checkoutProduct(k).price,
       qty: cart[k]
     })),
     subtotal: getSubtotal(),
@@ -1171,7 +1186,7 @@ function showToast(msg) {
   // 填入確認頁內容
   const subtotal = getSubtotal();
   const items = Object.keys(cart).filter(k => cart[k] > 0).map(k => {
-    const f = FLAVORS_DATA[parseInt(k)];
+    const f = checkoutProduct(k);
     return `<div style="display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--dark3);">
       <span>${f.name} × ${cart[k]}</span>
       <span>NT$ ${f.price * cart[k]}</span>
@@ -1202,7 +1217,7 @@ function showToast(msg) {
 
   const cart = JSON.parse(sessionStorage.getItem('cart') || '{}');
   const itemNames = Object.keys(cart).map(k => {
-    const f = FLAVORS_DATA[parseInt(k)];
+    const f = checkoutProduct(k);
     return f.name + 'x' + cart[k];
   }).join('#').substring(0, 200);
 
@@ -1230,9 +1245,9 @@ function showToast(msg) {
     payment: 'credit',
     note: document.getElementById('note')?.value || '',
     items: Object.keys(cart).filter(k => cart[k] > 0).map(k => ({
-      productNo: FLAVORS_DATA[parseInt(k)].product_no || `${Number(k) < 8 ? '10000' : '20000'}${Number(k) < 8 ? Number(k) + 1 : Number(k) - 7}`,
-      name: FLAVORS_DATA[parseInt(k)].name,
-      price: FLAVORS_DATA[parseInt(k)].price,
+      productNo: checkoutProduct(k).product_no,
+      name: checkoutProduct(k).name,
+      price: checkoutProduct(k).price,
       qty: cart[k]
     })),
     subtotal: subtotal,
