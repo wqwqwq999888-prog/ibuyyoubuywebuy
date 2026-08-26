@@ -9,6 +9,8 @@ const report = readFileSync(new URL('../partner-report.html', import.meta.url), 
 const reportScript = readFileSync(new URL('../partner-report.js', import.meta.url), 'utf8');
 const config = readFileSync(new URL('../admin/config.js', import.meta.url), 'utf8');
 const catalogMigration = readFileSync(new URL('../supabase/migrations/20260826000000_product_catalog_classification.sql', import.meta.url), 'utf8');
+const storefront = readFileSync(new URL('../storefront-catalog.js', import.meta.url), 'utf8');
+const home = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
 
 for (const label of ['商品管理', '物流管理', '折扣管理', '團購管理']) {
   assert.ok(html.includes(label), `後台缺少「${label}」`);
@@ -30,6 +32,9 @@ assert.ok(app.includes("input('product_type','商品分類'") && app.includes('c
 assert.ok(catalogMigration.includes("product_type in ('single', 'combo')"), '資料庫必須限制商品分類值');
 assert.ok(app.includes('一般折扣碼可以單獨使用'), '折扣碼介面必須說明不一定綁定團購主');
 assert.ok(checkout.includes('id="orderLoading"') && checkout.includes("getElementById('finalSubmitBtn')"), '送出訂單等待期間必須顯示明確的載入畫面');
+assert.ok(storefront.includes('/rest/v1/products?select=') && storefront.includes('&enabled=eq.true'), '前台必須讀取後台已上架商品');
+assert.ok(home.includes('applyStorefrontCatalog(await loadStorefrontCatalog())'), '首頁必須在繪製商品前同步雲端目錄');
+assert.ok(checkout.includes('applyCheckoutCatalog(await loadStorefrontCatalog(true))'), '結帳頁必須使用首頁同一份商品目錄快照');
 
 const staticIds = new Set([...html.matchAll(/id="([^"]+)"/g)].map(match => match[1]));
 const referencedIds = new Set([...app.matchAll(/\$\('#([^']+)'\)/g)].map(match => match[1]));
