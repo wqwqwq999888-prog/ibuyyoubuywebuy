@@ -2,6 +2,10 @@
 // 此檔不宣告 doPost；既有 doPost 必須先將 Netlify webhook 導向 handleOrderWebhook。
 // Supabase 是唯一主資料庫；新版 webhook 只寫 Sheet。下方回寫函式僅供舊正式網站過渡期相容。
 
+// 訂單副本固定寫回既有正式試算表，不使用 Apps Script 當下綁定的新試算表。
+var ORDER_SPREADSHEET_ID = '1jmAqYQ8SUJJ9331o6kfKUTHJ0XNJsKaa39mxpObXlGE';
+var ORDER_FROM_EMAIL = 'dzhenmai@gmail.com';
+
 // 舊版正式網站在切換完成前仍會使用；保留 24 欄 row builder 以避免中斷現行訂單。
 function buildOrderRow(data, itemsText, shippingText, deliveryInfo, paymentStatus, tradeNo) {
   var productAmount = Number(data.productAmount != null ? data.productAmount : data.subtotal || 0);
@@ -58,7 +62,7 @@ function handleOrderWebhook(e, request) {
   if (!expected || supplied !== expected) return ContentService.createTextOutput('Unauthorized');
 
   var order = request.order;
-  var spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
+  var spreadsheet = SpreadsheetApp.openById(ORDER_SPREADSHEET_ID);
   var sheets = spreadsheet ? spreadsheet.getSheets() : [];
   var sheet = sheets.find(function(candidate) {
     return typeof SHEET_GID !== 'undefined' && candidate.getSheetId() === Number(SHEET_GID);
@@ -124,6 +128,7 @@ function notifyNewServerOrder_(order, itemsText) {
     '\n電話：' + order.customer_phone + '\nEmail：' + order.customer_email +
     '\n商品：' + itemsText + '\n總額：NT$ ' + order.order_amount +
     '\n付款狀態：' + order.payment_status + '\n出貨狀態：' + order.shipping_status;
-  GmailApp.sendEmail(NOTIFY_EMAIL, '新訂單！' + order.customer_name + ' NT$' + order.order_amount + '－鬥陣買肉乾', ownerBody, {name:'鬥陣買肉乾'});
-  if (order.customer_email) GmailApp.sendEmail(order.customer_email, '【鬥陣買肉乾】訂單確認 － ' + order.order_no, customerBody, {name:'鬥陣買肉乾'});
+  var mailOptions = {name:'鬥陣買肉乾', from:ORDER_FROM_EMAIL, replyTo:ORDER_FROM_EMAIL};
+  GmailApp.sendEmail(NOTIFY_EMAIL, '新訂單！' + order.customer_name + ' NT$' + order.order_amount + '－鬥陣買肉乾', ownerBody, mailOptions);
+  if (order.customer_email) GmailApp.sendEmail(order.customer_email, '【鬥陣買肉乾】訂單確認 － ' + order.order_no, customerBody, mailOptions);
 }

@@ -59,6 +59,7 @@ const orderCreate = readFileSync(new URL('../netlify/functions/order-create.js',
 const sheetScript = readFileSync(new URL('../google-apps-script/order-fields.gs', import.meta.url), 'utf8');
 assert.ok(sheetScript.includes("request.action === 'upsertOrder'") && sheetScript.includes('notifyNewServerOrder_'), '只有正式新建訂單可寄送確認信');
 assert.ok(sheetScript.includes("headers.indexOf('訂單編號')") && sheetScript.includes('sheets[0]'), 'Apps Script 必須能辨識既有訂單工作表');
+assert.ok(sheetScript.includes("SpreadsheetApp.openById(ORDER_SPREADSHEET_ID)") && sheetScript.includes("ORDER_FROM_EMAIL = 'dzhenmai@gmail.com'"), '訂單副本與寄件人必須固定使用正式設定');
 assert.ok(orderCreate.includes('const existing = await supabase') && orderCreate.includes('sheetSynced'), '銀行匯款建單重試不可重複建立訂單，Sheet 失敗不可誤報訂單失敗');
 assert.ok(statusSync.includes('event.headers.Authorization'), 'Netlify 管理員驗證必須兼容 Authorization header 大小寫');
 assert.ok(orderHelper.includes("responseText !== 'OK'"), 'Google Sheet webhook 必須檢查 Apps Script 回應內容');
