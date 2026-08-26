@@ -939,6 +939,21 @@ function validate() {
 }
 
 // 送出訂單
+async function requestEcpaySignature(params, order) {
+  const response = await fetch('/.netlify/functions/ecpay-checkout', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ params, order })
+  });
+  const text = await response.text();
+  let result = {};
+  try { result = text ? JSON.parse(text) : {}; } catch (_) {}
+  if (!response.ok || !result.CheckMacValue) {
+    throw new Error(result.error || '付款初始化失敗，請稍後再試');
+  }
+  return result.CheckMacValue;
+}
+
 async function submitOrder() {
   if (!validate()) return;
 
@@ -1035,18 +1050,12 @@ async function submitOrder() {
 
   // 呼叫後端取得 CheckMacValue
   try {
-    const res = await fetch('/.netlify/functions/ecpay-checkout', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ params, order: { ...orderData, orderId: params.MerchantTradeNo } })
-    });
-    const data = await res.json();
-    params.CheckMacValue = data.CheckMacValue;
+    params.CheckMacValue = await requestEcpaySignature(params, { ...orderData, orderId: params.MerchantTradeNo });
   } catch(e) {
     document.getElementById('orderLoading').hidden = true;
     btn.disabled = false;
     btn.textContent = '確認下單 ✓';
-    showToast('付款初始化失敗，請稍後再試');
+    showToast(e.message || '付款初始化失敗，請稍後再試');
     return;
   }
 
@@ -1276,15 +1285,9 @@ function showToast(msg) {
   };
 
   try {
-    const res = await fetch('/.netlify/functions/ecpay-checkout', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ params, order: orderData })
-    });
-    const data = await res.json();
-    params.CheckMacValue = data.CheckMacValue;
+    params.CheckMacValue = await requestEcpaySignature(params, orderData);
   } catch(e) {
-    showToast('付款初始化失敗，請稍後再試');
+    showToast(e.message || '付款初始化失敗，請稍後再試');
     return;
   }
 
