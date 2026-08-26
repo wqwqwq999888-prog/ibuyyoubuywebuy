@@ -38,6 +38,7 @@ assert.ok(checkout.includes('applyCheckoutCatalog(await loadStorefrontCatalog(tr
 assert.ok(home.includes('function cartProduct(key)') && home.includes('const cartKey = c.product_no'), '首頁購物車必須以固定商品編號保存');
 assert.ok(checkout.includes('function checkoutProduct(key)') && checkout.includes("sessionStorage.setItem('cart', JSON.stringify(cart))"), '結帳頁必須依商品編號解析並遷移舊購物車');
 assert.ok(home.includes('function escapeStorefront(value)') && home.includes('escapeStorefront(f.description)'), '雲端商品文字輸出前必須轉義，且商品說明必須同步至詳情');
+assert.match(home, /\.combo-showcase-img-wrap\s*\{[^}]*aspect-ratio:\s*1\/1/, '送禮組合主圖必須維持正方形');
 
 const staticIds = new Set([...html.matchAll(/id="([^"]+)"/g)].map(match => match[1]));
 const referencedIds = new Set([...app.matchAll(/\$\('#([^']+)'\)/g)].map(match => match[1]));
