@@ -99,6 +99,13 @@ nav {
   padding-right: 36px; cursor: pointer;
 }
 .field input:focus, .field select:focus, .field textarea:focus { border-color: var(--gold); }
+.discount-entry { display:flex; gap:10px; }
+.discount-entry input {
+  flex:1; min-width:0; background:var(--dark3); color:var(--text);
+  border:1px solid var(--dark4); padding:12px 14px; outline:none;
+}
+.discount-entry input::placeholder { color:var(--text-dim); }
+.discount-entry input:focus { border-color:var(--gold); }
 .field input.error, .field select.error { border-color: var(--red); }
 .field .hint { font-size: 11px; color: var(--text-dim); }
 .field .err-msg { font-size: 11px; color: var(--red); display: none; }
@@ -311,6 +318,10 @@ nav {
             <span class="err-msg">請填寫有效的 Email</span>
           </div>
         </div>
+        <label style="display:flex;gap:10px;align-items:flex-start;color:var(--text-dim);font-size:13px;line-height:1.6">
+          <input type="checkbox" id="emailMarketingConsent" autocomplete="off" style="width:auto;margin-top:4px">
+          我願意收到新品與優惠 Email
+        </label>
       </div>
     </div>
 
@@ -439,11 +450,12 @@ nav {
   </div>
 </label>
       </div>
+    </div>
 
     <!-- 折扣碼 -->
     <div class="panel">
       <div class="panel-title">🏷️ 折扣碼 <span>選填</span></div>
-      <div style="display:flex;gap:10px"><input type="text" id="discountCode" placeholder="請輸入折扣碼" style="flex:1;text-transform:uppercase"><button type="button" onclick="applyDiscountCode()" style="padding:12px 18px;border:0;border-radius:4px;background:var(--gold);color:var(--dark);font-weight:700;cursor:pointer">套用</button></div>
+      <div class="discount-entry"><input type="text" id="discountCode" placeholder="請輸入折扣碼" style="text-transform:uppercase"><button type="button" onclick="applyDiscountCode()" style="padding:12px 18px;border:0;border-radius:4px;background:var(--gold);color:var(--dark);font-weight:700;cursor:pointer">套用</button></div>
       <p id="discountMessage" style="margin:8px 0 0;font-size:12px;color:var(--text-dim)"></p>
     </div>
 
@@ -667,6 +679,8 @@ let discountAmount = 0;
 
   // 頁面載入時：先回填、再綁定監聽
   window.addEventListener('DOMContentLoaded', () => {
+    // 行銷同意每次進入結帳都必須由客戶主動選擇，不沿用瀏覽器上次的勾選狀態。
+    document.getElementById('emailMarketingConsent').checked = false;
     setTimeout(() => {
       loadFormData();
       bindAutoSave();
@@ -888,12 +902,15 @@ async function submitOrder() {
       phone: document.getElementById('phone').value.trim(),
       email: document.getElementById('email').value.trim(),
     },
+    emailMarketingConsent: document.getElementById('emailMarketingConsent').checked,
    shipping: {
       method: selectedShipping,
       store711: document.getElementById('store711')?.value || '',
       store711Id: document.getElementById('store711Id')?.value || '',
+      store711Address: document.getElementById('store711Address')?.value || '',
       storefamily: document.getElementById('storefamily')?.value || '',
       storefamilyId: document.getElementById('storefamilyId')?.value || '',
+      storefamilyAddress: document.getElementById('storefamilyAddress')?.value || '',
       city: document.getElementById('city')?.value || '',
       address: document.getElementById('address')?.value || '',
     },
@@ -902,6 +919,7 @@ async function submitOrder() {
     transfer5: document.getElementById('transfer5b')?.value || document.getElementById('transfer5')?.value || '',
     transferTime: document.getElementById('transferTime')?.value || '',
     items: Object.keys(cart).filter(k => cart[k] > 0).map(k => ({
+      productNo: `${Number(k) < 8 ? '10000' : '20000'}${Number(k) < 8 ? Number(k) + 1 : Number(k) - 7}`,
       name: FLAVORS_DATA[k].name,
       price: FLAVORS_DATA[k].price,
       qty: cart[k]
@@ -915,19 +933,14 @@ async function submitOrder() {
     total: Math.max(0, getSubtotal() - discountAmount) + shippingFee,
   };
 
-  // 1. 送訂單到 Apps Script（寫試算表 + 寄信給你和客人）
-const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwRwtyxF3-EdHy9nT_7ZOn_LLoRPqw-Pf3vTY4m0yISa1YM2tiCSgdpWoLXghAeMo643w/exec';
-  try {
-    const payload = JSON.stringify(orderData);
-    fetch(APPS_SCRIPT_URL + '?data=' + encodeURIComponent(payload), {
-      method: 'GET',
-      mode: 'no-cors'
-    }).catch(e => console.log('Apps Script 送出:', e));
-  } catch(e) { console.log('Apps Script 錯誤:', e); }
-
-  // 2. 判斷付款方式
+  // 銀行匯款完成並填妥資料後，才由伺服器建立正式訂單。
   if (orderData.payment === 'bank') {
-    // 銀行匯款：直接顯示成功頁
+    try {
+      const response = await fetch('/.netlify/functions/order-create', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(orderData) });
+      if (!response.ok) throw new Error((await response.json()).error || '訂單建立失敗');
+    } catch (error) {
+      btn.disabled = false; btn.textContent = '確認下單 ✓'; showToast(error.message); return;
+    }
     sessionStorage.removeItem('cart');
     sessionStorage.removeItem('checkoutFormData');
     showSuccess(orderData);
@@ -970,7 +983,7 @@ const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwRwtyxF3-EdHy9
     const res = await fetch('/.netlify/functions/ecpay-checkout', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(params)
+      body: JSON.stringify({ params, order: { ...orderData, orderId: params.MerchantTradeNo } })
     });
     const data = await res.json();
     params.CheckMacValue = data.CheckMacValue;
@@ -1159,18 +1172,22 @@ function showToast(msg) {
       phone: document.getElementById('phone').value.trim(),
       email: document.getElementById('email').value.trim(),
     },
+    emailMarketingConsent: document.getElementById('emailMarketingConsent').checked,
   shipping: {
       method: selectedShipping,
       store711: document.getElementById('store711')?.value || '',
       store711Id: document.getElementById('store711Id')?.value || '',
+      store711Address: document.getElementById('store711Address')?.value || '',
       storefamily: document.getElementById('storefamily')?.value || '',
       storefamilyId: document.getElementById('storefamilyId')?.value || '',
+      storefamilyAddress: document.getElementById('storefamilyAddress')?.value || '',
       city: document.getElementById('city')?.value || '',
       address: document.getElementById('address')?.value || '',
     },
     payment: 'credit',
     note: document.getElementById('note')?.value || '',
     items: Object.keys(cart).filter(k => cart[k] > 0).map(k => ({
+      productNo: `${Number(k) < 8 ? '10000' : '20000'}${Number(k) < 8 ? Number(k) + 1 : Number(k) - 7}`,
       name: FLAVORS_DATA[parseInt(k)].name,
       price: FLAVORS_DATA[parseInt(k)].price,
       qty: cart[k]
@@ -1185,11 +1202,6 @@ function showToast(msg) {
     transfer5: '',
     transferTime: '',
   };
-  const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwRwtyxF3-EdHy9nT_7ZOn_LLoRPqw-Pf3vTY4m0yISa1YM2tiCSgdpWoLXghAeMo643w/exec';
-  fetch(APPS_SCRIPT_URL + '?data=' + encodeURIComponent(JSON.stringify(orderData)), {
-    method: 'GET', mode: 'no-cors'
-  }).catch(e => console.log('Apps Script 錯誤:', e));  
-
   const params = {
     MerchantID: '3504484',
     MerchantTradeNo: merchantTradeNo,
@@ -1209,7 +1221,7 @@ function showToast(msg) {
     const res = await fetch('/.netlify/functions/ecpay-checkout', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(params)
+      body: JSON.stringify({ params, order: orderData })
     });
     const data = await res.json();
     params.CheckMacValue = data.CheckMacValue;

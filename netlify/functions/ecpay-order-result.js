@@ -36,19 +36,7 @@ exports.handler = async (event) => {
   const tradeNo = params.TradeNo || '';
   const tradeAmt = params.TradeAmt || '';
 
-  // 同步付款結果到 Google Sheet：
-  // 成功 → confirmPayment 會正式寫入試算表（帶TradeNo、比對金額）
-  // 失敗 → confirmPayment 會直接清掉暫存資料，不寫入試算表
-  const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwRwtyxF3-EdHy9nT_7ZOn_LLoRPqw-Pf3vTY4m0yISa1YM2tiCSgdpWoLXghAeMo643w/exec';
-  const newStatus = isSuccess ? '已付款' : '付款失敗';
-  if (orderId) {
-    try {
-      const confirmUrl = `${APPS_SCRIPT_URL}?action=confirmPayment&orderId=${encodeURIComponent(orderId)}&status=${encodeURIComponent(newStatus)}&tradeNo=${encodeURIComponent(tradeNo)}&tradeAmt=${encodeURIComponent(tradeAmt)}`;
-      await fetch(confirmUrl);
-    } catch(e) {
-      console.error('更新試算表失敗:', e);
-    }
-  }
+  // 正式訂單只由 ReturnURL 的伺服器通知建立；瀏覽器導回頁絕不寫入訂單或試算表。
 
   const html = isSuccess
     ? renderSuccess(orderId)
