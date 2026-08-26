@@ -66,12 +66,24 @@ window.ADMIN_CONFIG = {
 
 ## 功能名稱
 
-側邊選單依需求固定為：
+側邊選單提供：
 
 1. 商品管理
 2. 物流管理
 3. 折扣管理
 4. 團購管理
+5. 訂單管理
+
+## 正式訂單流程
+
+- Supabase `orders` 是主資料庫；Google Sheet 是由 Netlify Functions 同步的 24 欄副本。
+- 銀行匯款只有在客戶填妥後五碼並正式送出後建立，初始狀態為「已匯款待確認／待出貨」。
+- 綠界訂單暫存在 `pending_ecpay_orders`，只有 ReturnURL 驗證 CheckMacValue、成功代碼及金額後才轉為正式訂單；付款失敗不會進入 orders 或試算表。
+- 後台可選擇顯示欄位，選擇保存在瀏覽器；修改付款／出貨狀態會呼叫 server function 並同步試算表。
+
+Netlify 正式環境需設定 `SUPABASE_URL`、`SUPABASE_SECRET_KEY`、`GOOGLE_SHEET_WEBHOOK_URL`、`GOOGLE_SHEET_WEBHOOK_SECRET`、`ECPAY_HASH_KEY`、`ECPAY_HASH_IV`。`sb_secret_` 僅由 server-side function 放在 `apikey` header，絕不可作為 Bearer JWT。請在 Apps Script 的 Script Properties 設定同一份 `WEBHOOK_SECRET`，不要寫入 repository 或貼在對話中。
+
+請先以正式專案 `astounding-rabanadas-a0a6e1` 的 Deploy Preview 驗收；驗收前不要合併，也不要部署到 Production。不得操作 `merry-biscuit-5014fe`。
 
 ## 尚未影響官網的部分
 

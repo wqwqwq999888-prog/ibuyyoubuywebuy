@@ -5,7 +5,8 @@ const pageMeta = {
   products: { title: '商品管理', action: '新增商品' },
   shipping: { title: '物流管理', action: '' },
   discounts: { title: '折扣管理', action: '新增折扣碼' },
-  campaigns: { title: '團購管理', action: '新增團購' }
+  campaigns: { title: '團購管理', action: '新增團購' },
+  orders: { title: '訂單管理', action: '' }
 };
 
 const seedData = {
@@ -44,11 +45,12 @@ function localLoad() {
 function localSave() { localStorage.setItem(STORAGE_KEY, JSON.stringify(state.data)); }
 
 async function api(path, options = {}) {
+  const authorization = state.token ? { Authorization: `Bearer ${state.token}` } : {};
   const response = await fetch(`${config.supabaseUrl}${path}`, {
     ...options,
     headers: {
       apikey: config.supabaseAnonKey,
-      Authorization: `Bearer ${state.token || config.supabaseAnonKey}`,
+      ...authorization,
       'Content-Type': 'application/json',
       ...options.headers
     }
@@ -68,11 +70,12 @@ async function cloudLogin(email, password) {
 }
 
 async function cloudLoad() {
-  let [products, shipping, discounts, campaigns] = await Promise.all([
+  let [products, shipping, discounts, campaigns, orders] = await Promise.all([
     api('/rest/v1/products?select=*&order=sort_order.asc,product_no.asc'),
     api('/rest/v1/shipping_methods?select=*&order=sort_order.asc'),
     api('/rest/v1/discounts?select=*&order=created_at.desc'),
-    api('/rest/v1/campaigns?select=*&order=created_at.desc')
+    api('/rest/v1/campaigns?select=*&order=created_at.desc'),
+    api('/rest/v1/orders?select=*&order=created_at.desc')
   ]);
   // 新建立的雲端資料庫沒有商品時，自動放入官網目前的商品。
   // 僅在完全空白時執行，之後不會覆蓋後台所做的修改。
@@ -84,7 +87,7 @@ async function cloudLoad() {
     });
     products = await api('/rest/v1/products?select=*&order=sort_order.asc,product_no.asc');
   }
-  return { products, shipping_methods: shipping, discounts, campaigns };
+  return { products, shipping_methods: shipping, discounts, campaigns, orders };
 }
 
 async function saveRecord(table, record, idField = 'id') {
@@ -187,7 +190,49 @@ function renderCampaigns() {
   $('#activeCampaignCount').textContent = state.data.campaigns.filter(isCurrentlyActive).length;
 }
 
-function renderAll() { renderProducts(); renderShipping(); renderDiscounts(); renderCampaigns(); setPage(state.page); }
+const ORDER_COLUMNS = [
+  ['created_at','訂單時間'],['order_no','訂單編號'],['customer_name','客戶姓名'],['customer_phone','電話'],['customer_email','Email'],
+  ['items','商品明細'],['order_amount','訂單總額'],['shipping_method','配送方式'],['shipping_details','配送資料'],['transfer_last_five','匯款後五碼'],
+  ['transfer_time','匯款時間'],['note','備註'],['payment_status','付款狀態'],['shipping_status','出貨狀態'],['trade_no','金流交易號'],
+  ['shipped_at','出貨時間'],['completed_at','完成時間'],['product_cost','商品成本'],['product_amount','商品金額'],['discount_amount','折扣金額'],
+  ['shipping_fee','運費'],['discount_code','折扣碼'],['partner_name','團購主'],['gross_profit','毛利']
+];
+const ORDER_COLUMN_KEY = 'ibuy-admin-order-columns-v1';
+function selectedOrderColumns() { try { const saved=JSON.parse(localStorage.getItem(ORDER_COLUMN_KEY)); return Array.isArray(saved)&&saved.length?saved:ORDER_COLUMNS.map(c=>c[0]); } catch { return ORDER_COLUMNS.map(c=>c[0]); } }
+function orderCell(order, key) {
+  if (key === 'payment_status') return `<select class="order-status" data-kind="payment" data-order="${escapeHtml(order.order_no)}">${['待付款','已付款','已匯款待確認','付款失敗'].map(s=>`<option ${s===order[key]?'selected':''}>${s}</option>`).join('')}</select>`;
+  if (key === 'shipping_status') return `<select class="order-status" data-kind="shipping" data-order="${escapeHtml(order.order_no)}">${['待出貨','已出貨','已完成'].map(s=>`<option ${s===order[key]?'selected':''}>${s}</option>`).join('')}</select>`;
+  if (key === 'items') return escapeHtml((order.items||[]).map(i=>`${i.name} × ${i.qty}`).join('、'));
+  if (key === 'shipping_details') return escapeHtml(JSON.stringify(order[key]||{}));
+  if (['order_amount','product_cost','product_amount','discount_amount','shipping_fee','gross_profit'].includes(key)) return money(order[key]);
+  if (key.endsWith('_at') || key === 'transfer_time') return order[key] ? new Date(order[key]).toLocaleString('zh-TW') : '—';
+  return escapeHtml(order[key] ?? '—');
+}
+function renderOrders() {
+  const visible=selectedOrderColumns(); const columns=ORDER_COLUMNS.filter(([key])=>visible.includes(key));
+  $('#orderHead').innerHTML=`<tr>${columns.map(([,label])=>`<th>${label}</th>`).join('')}</tr>`;
+  $('#orderRows').innerHTML=(state.data.orders||[]).map(order=>`<tr>${columns.map(([key])=>`<td>${orderCell(order,key)}</td>`).join('')}</tr>`).join('');
+  $('#orderEmpty').classList.toggle('hidden',(state.data.orders||[]).length>0);
+  $('#orderColumnPicker').innerHTML=ORDER_COLUMNS.map(([key,label])=>`<label><input type="checkbox" value="${key}" ${visible.includes(key)?'checked':''}> ${label}</label>`).join('');
+  renderOrderSummary();
+}
+function renderOrderSummary() {
+  const now=new Date();
+  if(!$('#orderReportMonth').value) $('#orderReportMonth').value=`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
+  const [year,month]=$('#orderReportMonth').value.split('-').map(Number);
+  const paid=(state.data.orders||[]).filter(order=>order.payment_status==='已付款');
+  const inYear=paid.filter(order=>new Date(order.created_at).getFullYear()===year);
+  const inMonth=inYear.filter(order=>new Date(order.created_at).getMonth()+1===month);
+  const sum=(orders,key)=>orders.reduce((total,order)=>total+Number(order[key]||0),0);
+  $('#monthSales').textContent=money(sum(inMonth,'order_amount'));
+  $('#monthProfit').textContent=money(sum(inMonth,'gross_profit'));
+  $('#yearSales').textContent=money(sum(inYear,'order_amount'));
+  $('#yearProfit').textContent=money(sum(inYear,'gross_profit'));
+  $('#monthPaidOrders').textContent=`${inMonth.length} 筆已付款`;
+  $('#yearPaidOrders').textContent=`${inYear.length} 筆已付款`;
+}
+
+function renderAll() { renderProducts(); renderShipping(); renderDiscounts(); renderCampaigns(); renderOrders(); setPage(state.page); }
 function input(name, label, value = '', options = {}) {
   const wide = options.wide ? 'wide' : '';
   if (options.type === 'textarea') return `<div class="${wide}"><label for="field-${name}">${label}</label><textarea id="field-${name}" name="${name}" ${options.required ? 'required' : ''}>${escapeHtml(value)}</textarea></div>`;
@@ -280,6 +325,11 @@ document.addEventListener('click', async event => {
   const remove = event.target.closest('[data-delete]'); if(remove && confirm('確定要刪除這筆資料嗎？')){const table=remove.dataset.delete==='discount'?'discounts':'campaigns';await deleteRecord(table,remove.dataset.id);state.data=isLocal?localLoad():await cloudLoad();renderAll();toast('資料已刪除');return;}
   const copy = event.target.closest('[data-copy]'); if(copy){try{await navigator.clipboard.writeText(copy.dataset.copy);toast('專屬連結已複製');}catch{window.prompt('請複製這個專屬連結：',copy.dataset.copy);} }
 });
+
+$('#chooseOrderColumns').addEventListener('click',()=>$('#orderColumnPicker').classList.toggle('hidden'));
+$('#orderReportMonth').addEventListener('change',renderOrderSummary);
+$('#orderColumnPicker').addEventListener('change',()=>{const values=[...$('#orderColumnPicker').querySelectorAll(':checked')].map(i=>i.value);if(!values.length)return toast('至少保留一個欄位');localStorage.setItem(ORDER_COLUMN_KEY,JSON.stringify(values));renderOrders();});
+$('#orderRows').addEventListener('change',async event=>{if(!event.target.matches('.order-status'))return;const order=state.data.orders.find(o=>o.order_no===event.target.dataset.order);if(!order)return;const body={orderNo:order.order_no,paymentStatus:event.target.dataset.kind==='payment'?event.target.value:order.payment_status,shippingStatus:event.target.dataset.kind==='shipping'?event.target.value:order.shipping_status};setSaving(true);try{const response=await fetch('/.netlify/functions/order-status-sync',{method:'POST',headers:{'Content-Type':'application/json',Authorization:`Bearer ${state.token}`},body:JSON.stringify(body)});const text=await response.text();let result={};try{result=text?JSON.parse(text):{};}catch{result={error:text};}if(!response.ok)throw new Error(result.error||'狀態更新失敗');state.data=await cloudLoad();renderOrders();toast('訂單與試算表已同步');}catch(error){renderOrders();toast(error.message||'狀態更新失敗');}finally{setSaving(false);}});
 
 $('#primaryAction').addEventListener('click', () => state.page==='products'?openProduct():state.page==='discounts'?openDiscount():openCampaign());
 $('#closeModal').addEventListener('click', closeModal); $('#cancelModal').addEventListener('click', closeModal);

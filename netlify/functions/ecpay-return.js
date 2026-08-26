@@ -1,4 +1,5 @@
 const crypto = require('crypto');
+const { supabase, normalizeOrder, addProductCosts, syncSheet } = require('./_orders');
 
 exports.handler = async (event) => {
   if (event.httpMethod !== 'POST') {
@@ -34,11 +35,16 @@ exports.handler = async (event) => {
 
   if (params.RtnCode === '1') {
     const orderId = params.MerchantTradeNo;
-    const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwRwtyxF3-EdHy9nT_7ZOn_LLoRPqw-Pf3vTY4m0yISa1YM2tiCSgdpWoLXghAeMo643w/exec';
     try {
-      await fetch(`${APPS_SCRIPT_URL}?action=updatePayment&orderId=${orderId}&status=已付款`);
+      const pending = await supabase(`pending_ecpay_orders?order_no=eq.${encodeURIComponent(orderId)}&select=*`);
+      if (!pending.length || Number(params.TradeAmt) !== pending[0].expected_amount) return { statusCode: 200, body: '0|AmountError' };
+      const order = await addProductCosts(normalizeOrder({ ...pending[0].payload, tradeNo: params.TradeNo }, '已付款'));
+      const created = await supabase('orders?on_conflict=order_no', { method: 'POST', headers: { Prefer: 'resolution=ignore-duplicates,return=representation' }, body: JSON.stringify(order) });
+      if (created.length) await syncSheet(created[0]);
+      await supabase(`pending_ecpay_orders?order_no=eq.${encodeURIComponent(orderId)}`, { method: 'DELETE' });
     } catch(e) {
-      console.error('更新試算表失敗:', e);
+      console.error('建立付款訂單失敗:', e);
+      return { statusCode: 200, body: '0|OrderError' };
     }
   }
 
