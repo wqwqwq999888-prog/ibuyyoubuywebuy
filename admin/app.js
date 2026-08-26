@@ -255,6 +255,8 @@ function openProduct(product = {}) {
     ${input('name','商品名稱',product.name)}
     ${input('price','售價',product.price || 0,{type:'number',min:0,required:true})}
     ${input('cost','成本（選填）',product.cost || 0,{type:'number',min:0,step:'0.01'})}
+    ${input('product_type','商品分類',product.product_type || (String(product.product_no || '').startsWith('2') ? 'combo' : 'single'),{type:'select',choices:[['single','單包商品（顯示於口味區）'],['combo','組合商品（顯示於組合區）']]})}
+    ${input('combo_contents','組合內容（僅組合商品填寫）',product.combo_contents || '',{wide:true})}
     ${input('specification','規格',product.specification || '200 克／包',{wide:true,required:true})}
     ${input('description','商品說明、成分、食品添加物、過敏原',product.description || '',{type:'textarea',wide:true})}
     <div class="wide image-editor"><img id="imagePreview" class="image-preview" src="${escapeHtml(product.image_url || '')}" alt="商品圖片預覽"><div><label for="productImage">商品圖片（每個商品一張）</label><input id="productImage" name="productImage" type="file" accept="image/jpeg,image/png,image/webp"><input name="image_url" type="hidden" value="${escapeHtml(product.image_url || '')}"><p class="image-help">建議使用正方形 JPG、PNG 或 WebP。正式雲端模式會自動上傳並保存圖片網址。</p></div></div>
@@ -267,7 +269,7 @@ function openProduct(product = {}) {
 
 function openDiscount(item = {}) {
   state.editor = { type: 'discount', originalId: item.id || '' }; $('#modalTitle').textContent = item.id ? '編輯折扣碼' : '新增折扣碼';
-  $('#editorFields').innerHTML = `${input('name','折扣名稱',item.name || '',{required:true})}${input('code','折扣碼',item.code || '',{required:true})}${input('discount_type','折扣方式',item.discount_type || 'fixed',{type:'select',choices:[['fixed','固定金額'],['percent','百分比（輸入 9 代表 9 折）']]})}${input('discount_value','折扣值',item.discount_value || 0,{type:'number',min:0,step:'0.01',required:true})}${input('minimum_amount','最低消費',item.minimum_amount || 0,{type:'number',min:0,required:true})}${input('usage_limit','總使用上限（0 代表不限）',item.usage_limit || 0,{type:'number',min:0})}${input('starts_at','開始時間',toLocalInput(item.starts_at),{type:'datetime-local'})}${input('ends_at','結束時間',toLocalInput(item.ends_at),{type:'datetime-local'})}${input('enabled','狀態',String(item.enabled ?? true),{type:'select',choices:[['true','啟用'],['false','停用']]})}`;
+  $('#editorFields').innerHTML = `<p class="wide image-help">一般折扣碼可以單獨使用，不會自動綁定團購主；只有在「團購管理」另外建立活動時才會產生團購主關聯。</p>${input('name','折扣名稱',item.name || '',{required:true})}${input('code','折扣碼',item.code || '',{required:true})}${input('discount_type','折扣方式',item.discount_type || 'fixed',{type:'select',choices:[['fixed','固定金額'],['percent','百分比（輸入 9 代表 9 折）']]})}${input('discount_value','折扣值',item.discount_value || 0,{type:'number',min:0,step:'0.01',required:true})}${input('minimum_amount','最低消費',item.minimum_amount || 0,{type:'number',min:0,required:true})}${input('usage_limit','總使用上限（0 代表不限）',item.usage_limit || 0,{type:'number',min:0})}${input('starts_at','開始時間',toLocalInput(item.starts_at),{type:'datetime-local'})}${input('ends_at','結束時間',toLocalInput(item.ends_at),{type:'datetime-local'})}${input('enabled','狀態',String(item.enabled ?? true),{type:'select',choices:[['true','啟用'],['false','停用']]})}`;
   showModal();
 }
 
@@ -294,7 +296,7 @@ async function submitEditor(event) {
       const duplicate = state.data.products.some(p => p.product_no === data.product_no && p.product_no !== state.editor.originalId);
       if (duplicate) throw new Error('商品編號已經存在');
       const file = $('#productImage').files[0];
-      const record = { product_no:data.product_no,name:data.name.trim(),price:Number(data.price),cost:Number(data.cost || 0),specification:data.specification.trim(),description:data.description.trim(),image_url:file ? await uploadImage(file,data.product_no) : data.image_url,sort_order:Number(data.sort_order || 0),enabled:data.enabled==='true' };
+      const record = { product_no:data.product_no,name:data.name.trim(),price:Number(data.price),cost:Number(data.cost || 0),product_type:data.product_type,combo_contents:data.product_type==='combo' ? data.combo_contents.trim() : '',specification:data.specification.trim(),description:data.description.trim(),image_url:file ? await uploadImage(file,data.product_no) : data.image_url,sort_order:Number(data.sort_order || 0),enabled:data.enabled==='true' };
       if (state.editor.originalId && state.editor.originalId !== record.product_no) await deleteRecord('products', state.editor.originalId, 'product_no');
       await saveRecord('products', record, 'product_no');
     } else if (state.editor.type === 'discount') {
