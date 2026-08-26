@@ -57,7 +57,13 @@ function isOrderWebhookRequest(request) {
 }
 
 function shippingMethodText_(method) {
-  return ({'711':'7-11超商取貨','family':'全家超商取貨','kuroneko':'黑貓宅配'})[method] || method || '';
+  return ({'711':'7-ELEVEN 超商取貨','family':'全家 FamilyMart 超商取貨','kuroneko':'黑貓宅急便'})[method] || method || '';
+}
+
+function taipeiTimestamp_(value) {
+  var date = value ? new Date(value) : new Date();
+  if (isNaN(date.getTime())) return String(value || '');
+  return Utilities.formatDate(date, 'Asia/Taipei', 'yyyy/MM/dd HH:mm:ss');
 }
 
 function deliveryInfoText_(method, details) {
@@ -98,7 +104,7 @@ function handleOrderWebhook(e, request) {
   }).join('、');
   var shippingDetails = order.shipping_details || {};
   var row = [
-    order.created_at, order.order_no, order.customer_name, order.customer_phone,
+    taipeiTimestamp_(order.created_at), order.order_no, order.customer_name, order.customer_phone,
     order.customer_email, itemsText, 'NT$ ' + order.order_amount, shippingMethodText_(order.shipping_method),
     deliveryInfoText_(order.shipping_method, shippingDetails), order.transfer_last_five,
     order.transfer_time || '', order.note, order.payment_status, order.shipping_status,

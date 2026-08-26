@@ -80,6 +80,8 @@ assert.ok(sheetScript.includes("headers.indexOf('訂單編號')") && sheetScript
 assert.ok(sheetScript.includes("SpreadsheetApp.openById(ORDER_SPREADSHEET_ID)") && sheetScript.includes("ORDER_FROM_EMAIL = 'dzhenmai@gmail.com'"), '訂單副本與寄件人必須固定使用正式設定');
 assert.ok(checkout.includes("store711Address: document.getElementById('store711Address')") && checkout.includes("storefamilyAddress: document.getElementById('storefamilyAddress')"), '結帳訂單必須保留超商門市地址');
 assert.ok(sheetScript.includes('shippingMethodText_(order.shipping_method)') && sheetScript.includes('deliveryInfoText_(order.shipping_method, shippingDetails)'), 'Sheet 必須寫入可讀的配送方式與門市資料');
+assert.ok(sheetScript.includes("Utilities.formatDate(date, 'Asia/Taipei'") && sheetScript.includes('taipeiTimestamp_(order.created_at)'), 'Sheet 訂單時間必須轉成台北時區');
+assert.ok(sheetScript.includes("'kuroneko':'黑貓宅急便'") && sheetScript.includes("'711':'7-ELEVEN 超商取貨'"), 'Sheet 物流名稱必須與結帳頁一致');
 assert.ok(app.includes('shippingDetailsText(order)') && !app.includes("escapeHtml(JSON.stringify(order[key]||{}))"), '後台不得直接顯示配送 JSON');
 assert.ok(orderCreate.includes('const existing = await supabase') && orderCreate.includes('sheetSynced'), '銀行匯款建單重試不可重複建立訂單，Sheet 失敗不可誤報訂單失敗');
 assert.ok(statusSync.includes('event.headers.Authorization'), 'Netlify 管理員驗證必須兼容 Authorization header 大小寫');
