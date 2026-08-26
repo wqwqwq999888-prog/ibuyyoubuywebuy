@@ -1,5 +1,5 @@
 const crypto = require('crypto');
-const { supabase, normalizeOrder } = require('./_orders');
+const { supabase, normalizeOrder, validateProductPricing } = require('./_orders');
 
 function ecpayEncode(str) {
   return encodeURIComponent(str)
@@ -37,13 +37,25 @@ exports.handler = async (event) => {
   const request = JSON.parse(event.body || '{}');
   const params = request.params || request;
   if (request.order) {
-    const pending = normalizeOrder(request.order, '待付款');
+    let pending;
+    try {
+      pending = await validateProductPricing(normalizeOrder(request.order, '待付款'));
+    } catch (error) {
+      return { statusCode: 400, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ error: error.message }) };
+    }
     if (pending.order_no !== params.MerchantTradeNo || Number(params.TotalAmount) !== pending.order_amount) {
       return { statusCode: 400, body: JSON.stringify({ error: '付款資料與訂單不一致' }) };
     }
+    const validatedPayload = {
+      ...request.order,
+      items: pending.items,
+      subtotal: pending.product_amount,
+      productAmount: pending.product_amount,
+      total: pending.order_amount
+    };
     await supabase('pending_ecpay_orders?on_conflict=order_no', {
       method: 'POST', headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
-      body: JSON.stringify({ order_no: pending.order_no, payload: request.order, expected_amount: pending.order_amount })
+      body: JSON.stringify({ order_no: pending.order_no, payload: validatedPayload, expected_amount: pending.order_amount })
     });
   }
 

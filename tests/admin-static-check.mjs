@@ -64,11 +64,13 @@ assert.ok(checkout.includes('class="discount-entry"'), '折扣碼輸入框必須
 assert.ok(html.includes('id="monthSales"') && html.includes('id="yearProfit"'), '訂單後台必須提供月／年銷售及淨利統計');
 assert.ok(app.includes("payment_status==='已付款'") && app.includes('renderOrderSummary'), '營運統計只能計入已付款訂單');
 assert.ok(orderHelper.includes('addProductCosts') && checkout.includes('productNo:'), '正式訂單必須依商品後台成本計算毛利');
+assert.ok(orderHelper.includes('validateProductPricing') && orderHelper.includes('&enabled=eq.true&select=product_no,name,price'), '伺服器必須依已上架商品重新驗證名稱與售價');
 assert.ok(!checkout.includes('script.google.com/macros'), '結帳前端不得直接寫入 Google Sheet');
 assert.ok(migration.includes("'已匯款待確認'") && migration.includes("'已完成'"), 'migration 必須限制付款與出貨狀態');
 assert.ok(reconcileMigration.includes('add column if not exists') && reconcileMigration.includes('pending_ecpay_orders'), '既有部分 schema 必須能安全補齊');
 const statusSync = readFileSync(new URL('../netlify/functions/order-status-sync.js', import.meta.url), 'utf8');
 const orderCreate = readFileSync(new URL('../netlify/functions/order-create.js', import.meta.url), 'utf8');
+const ecpayCheckout = readFileSync(new URL('../netlify/functions/ecpay-checkout.js', import.meta.url), 'utf8');
 const sheetScript = readFileSync(new URL('../google-apps-script/order-fields.gs', import.meta.url), 'utf8');
 assert.ok(sheetScript.includes("request.action === 'upsertOrder'") && sheetScript.includes('notifyNewServerOrder_'), '只有正式新建訂單可寄送確認信');
 assert.ok(sheetScript.includes("headers.indexOf('訂單編號')") && sheetScript.includes('sheets[0]'), 'Apps Script 必須能辨識既有訂單工作表');
@@ -81,3 +83,5 @@ assert.ok(statusSync.includes('event.headers.Authorization'), 'Netlify 管理員
 assert.ok(orderHelper.includes("responseText !== 'OK'"), 'Google Sheet webhook 必須檢查 Apps Script 回應內容');
 assert.ok(orderHelper.includes("apikey: SUPABASE_KEY") && !orderHelper.includes('Bearer ${SUPABASE_KEY}'), 'sb_secret_ 只能作為 apikey');
 assert.ok(ecpayReturn.includes("params.RtnCode === '1'") && ecpayReturn.includes('expected_amount'), '綠界成功及金額驗證後才可建立訂單');
+assert.ok(orderCreate.includes('await validateProductPricing') && ecpayCheckout.includes('await validateProductPricing'), '匯款建單與綠界付款初始化都必須驗證後台商品價格');
+assert.ok(ecpayCheckout.includes('payload: validatedPayload'), '綠界付款完成後必須使用付款初始化時驗證過的商品快照');
