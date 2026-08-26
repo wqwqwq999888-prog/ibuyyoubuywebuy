@@ -1,4 +1,5 @@
 const crypto = require('crypto');
+const { supabase, normalizeOrder } = require('./_orders');
 
 function ecpayEncode(str) {
   return encodeURIComponent(str)
@@ -33,7 +34,18 @@ exports.handler = async (event) => {
   const HASH_KEY = process.env.ECPAY_HASH_KEY;
   const HASH_IV = process.env.ECPAY_HASH_IV;
 
-  const params = JSON.parse(event.body);
+  const request = JSON.parse(event.body || '{}');
+  const params = request.params || request;
+  if (request.order) {
+    const pending = normalizeOrder(request.order, '待付款');
+    if (pending.order_no !== params.MerchantTradeNo || Number(params.TotalAmount) !== pending.order_amount) {
+      return { statusCode: 400, body: JSON.stringify({ error: '付款資料與訂單不一致' }) };
+    }
+    await supabase('pending_ecpay_orders?on_conflict=order_no', {
+      method: 'POST', headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
+      body: JSON.stringify({ order_no: pending.order_no, payload: request.order, expected_amount: pending.order_amount })
+    });
+  }
 
   const sorted = Object.keys(params).sort((a, b) =>
     a.toLowerCase().localeCompare(b.toLowerCase())
