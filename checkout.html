@@ -628,6 +628,11 @@ function checkoutProduct(key) {
   return FLAVORS_DATA.find(product => product.product_no === String(key));
 }
 
+function checkoutItemSpecification(product, qty) {
+  const specification = product.specification || (product.product_type === 'combo' ? '200 克／包，共 3 包' : '200 克／包');
+  return product.product_type === 'combo' ? `${specification} × ${qty} 組` : `${specification} × ${qty}`;
+}
+
 function applyCheckoutCatalog(products) {
   if (!products) return;
   const fallbackProducts = [...FLAVORS_DATA];
@@ -765,7 +770,7 @@ function renderOrderSummary() {
       <img class="order-item-img" src="${f.image_url || `data:image/jpeg;base64,${FLAVOR_IMGS[f.name]}`}" alt="${f.name}">
       <div>
         <div class="order-item-name">${f.name}</div>
-        <div class="order-item-qty">200克 × ${qty}</div>
+        <div class="order-item-qty">${checkoutItemSpecification(f, qty)}</div>
       </div>
       <div class="order-item-price">NT$ ${f.price * qty}</div>
     </div>`;
