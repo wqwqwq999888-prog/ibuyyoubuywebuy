@@ -751,6 +751,8 @@ const COMBOS = [
 let comboIdx = 0;
 
 // 購物車統一商品查找表：單一口味(0~7) + 送禮組合(8~10)，讓組合在購物車顯示為單一品項
+FLAVORS.forEach((product, index) => { product.product_no ||= `10000${index + 1}`; });
+COMBOS.forEach((product, index) => { product.product_no ||= `20000${index + 1}`; });
 const CART_PRODUCTS = FLAVORS.concat(COMBOS.map(c => ({
   name: c.name,
   price: c.price,
@@ -769,8 +771,9 @@ function escapeStorefront(value) {
   return String(value ?? '').replace(/[&<>'"]/g, char => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', "'":'&#39;', '"':'&quot;' })[char]);
 }
 
+const PRODUCT_IMAGE_PLACEHOLDER = 'data:image/svg+xml;charset=UTF-8,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 600"%3E%3Crect width="600" height="600" fill="%23202020"/%3E%3Ctext x="300" y="300" fill="%23c9a84c" font-size="32" text-anchor="middle" dominant-baseline="middle"%3E%E5%95%86%E5%93%81%E5%9C%96%E7%89%87%E6%BA%96%E5%82%99%E4%B8%AD%3C/text%3E%3C/svg%3E';
 function imageSource(product, fallback) {
-  return product.image_url || `data:image/jpeg;base64,${fallback.img}`;
+  return product.image_url || (fallback?.img ? `data:image/jpeg;base64,${fallback.img}` : PRODUCT_IMAGE_PLACEHOLDER);
 }
 
 function applyStorefrontCatalog(products) {
@@ -780,13 +783,13 @@ function applyStorefrontCatalog(products) {
   const singles = products.filter(product => product.product_type === 'single');
   const combos = products.filter(product => product.product_type === 'combo');
   FLAVORS.splice(0, FLAVORS.length, ...singles.map((product, index) => {
-    const fallback = oldFlavors.find(item => item.product_no === product.product_no) || oldFlavors[index] || oldFlavors[0];
-    return { ...fallback, ...product, imgSrc: imageSource(product, fallback), unit: '包' };
+    const fallback = oldFlavors.find(item => item.product_no === product.product_no);
+    return { tag: '新品', ...(fallback || {}), ...product, imgSrc: imageSource(product, fallback), unit: '包' };
   }));
   COMBOS.splice(0, COMBOS.length, ...combos.map((product, index) => {
-    const fallback = oldCombos[index] || oldCombos[0];
+    const fallback = oldCombos.find(item => item.product_no === product.product_no);
     const flavorNames = (product.combo_contents || '').split('、').filter(Boolean);
-    return { ...fallback, ...product, badge: product.name, flavors: flavorNames, imgSrc: imageSource(product, fallback), unit: '組' };
+    return { ...(fallback || {}), ...product, badge: product.name, flavors: flavorNames, imgSrc: imageSource(product, fallback), unit: '組' };
   }));
   CART_PRODUCTS.splice(0, CART_PRODUCTS.length,
     ...FLAVORS,

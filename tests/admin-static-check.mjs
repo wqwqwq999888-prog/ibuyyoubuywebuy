@@ -40,6 +40,7 @@ assert.ok(checkout.includes('function checkoutProduct(key)') && checkout.include
 assert.ok(checkout.includes('function checkoutItemSpecification(product, qty)') && checkout.includes("`${specification} × ${qty} 組`"), '結帳頁必須以組為數量單位顯示組合商品規格');
 assert.ok(home.includes('function escapeStorefront(value)') && home.includes('escapeStorefront(f.description)'), '雲端商品文字輸出前必須轉義，且商品說明必須同步至詳情');
 assert.match(home, /\.combo-showcase-img-wrap\s*\{[^}]*aspect-ratio:\s*1\/1/, '送禮組合主圖必須維持正方形');
+assert.ok(home.includes('PRODUCT_IMAGE_PLACEHOLDER') && !home.includes('oldFlavors[index] || oldFlavors[0]'), '新商品未上傳圖片時不得誤用既有商品圖片');
 
 const staticIds = new Set([...html.matchAll(/id="([^"]+)"/g)].map(match => match[1]));
 const referencedIds = new Set([...app.matchAll(/\$\('#([^']+)'\)/g)].map(match => match[1]));
