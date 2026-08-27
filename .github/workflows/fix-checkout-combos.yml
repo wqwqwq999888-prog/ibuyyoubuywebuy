@@ -3,8 +3,9 @@ name: Verify checkout and ECPay integrations
 on:
   push:
     branches: [main]
+  # Run on every PR so a mistakenly selected base branch still gets checks.
+  # Production deployment nevertheless requires the PR base to be main.
   pull_request:
-    branches: [main]
 
 permissions:
   contents: read

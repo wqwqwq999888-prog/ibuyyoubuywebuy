@@ -9,12 +9,14 @@ const report = readFileSync(new URL('../partner-report.html', import.meta.url), 
 const reportScript = readFileSync(new URL('../partner-report.js', import.meta.url), 'utf8');
 const config = readFileSync(new URL('../admin/config.js', import.meta.url), 'utf8');
 const catalogMigration = readFileSync(new URL('../supabase/migrations/20260826000000_product_catalog_classification.sql', import.meta.url), 'utf8');
+const workflow = readFileSync(new URL('../.github/workflows/fix-checkout-combos.yml', import.meta.url), 'utf8');
 
 for (const label of ['商品管理', '物流管理', '折扣管理', '團購管理']) {
   assert.ok(html.includes(label), `後台缺少「${label}」`);
 }
 
 assert.match(html, /<script src="app\.js\?v=[^"]+"><\/script>/, 'app.js 必須有部署版本碼，避免後台持續使用舊快取');
+assert.match(workflow, /pull_request:\s*\n/, '所有 PR 都必須執行檢查，即使誤選非 main 的 base branch');
 assert.ok(!html.includes('type="module"'), '本地預覽不應依賴 module HTTP 載入');
 assert.ok(launcher.includes('url=admin/index.html'), '根目錄啟動頁必須導向後台');
 assert.ok(app.includes("free_threshold: 1500"), '超商免運門檻預設值應為 1500');
