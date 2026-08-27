@@ -73,3 +73,6 @@ assert.ok(statusSync.includes('event.headers.Authorization'), 'Netlify 管理員
 assert.ok(orderHelper.includes("responseText !== 'OK'"), 'Google Sheet webhook 必須檢查 Apps Script 回應內容');
 assert.ok(orderHelper.includes("apikey: SUPABASE_KEY") && !orderHelper.includes('Bearer ${SUPABASE_KEY}'), 'sb_secret_ 只能作為 apikey');
 assert.ok(ecpayReturn.includes("params.RtnCode === '1'") && ecpayReturn.includes('expected_amount'), '綠界成功及金額驗證後才可建立訂單');
+assert.ok(app.includes('建立綠界物流單') && app.includes('/.netlify/functions/ecpay-logistics-create'), '配送資料欄必須能建立綠界物流單');
+assert.ok(app.includes("order.payment_status==='已付款'") && app.includes("order.payment_method==='bank'") && app.includes("order.payment_status==='已匯款待確認'"), '物流按鈕必須支援已付款與已送出匯款資料的銀行匯款訂單');
+assert.ok(app.includes('!order.logistics_trade_no'), '已建立物流單的訂單不得再次顯示物流按鈕');

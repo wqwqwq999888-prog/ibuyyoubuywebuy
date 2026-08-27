@@ -36,6 +36,14 @@ exports.handler = async (event) => {
   if (params.RtnCode === '1') {
     const orderId = params.MerchantTradeNo;
     try {
+      // ReturnURL may be delivered more than once.  A completed order is the
+      // source of truth after its pending checkout row has been removed.
+      const existing = await supabase(`orders?order_no=eq.${encodeURIComponent(orderId)}&select=order_no,order_amount`);
+      if (existing.length) {
+        return Number(params.TradeAmt) === Number(existing[0].order_amount)
+          ? { statusCode: 200, headers: { 'Content-Type': 'text/plain' }, body: '1|OK' }
+          : { statusCode: 200, body: '0|AmountError' };
+      }
       const pending = await supabase(`pending_ecpay_orders?order_no=eq.${encodeURIComponent(orderId)}&select=*`);
       if (!pending.length || Number(params.TradeAmt) !== pending[0].expected_amount) return { statusCode: 200, body: '0|AmountError' };
       const order = await addProductCosts(normalizeOrder({ ...pending[0].payload, tradeNo: params.TradeNo }, '已付款'));

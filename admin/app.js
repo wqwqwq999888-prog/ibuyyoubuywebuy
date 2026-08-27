@@ -211,7 +211,15 @@ function orderCell(order, key) {
   if (key === 'shipping_status') return `<select class="order-status" data-kind="shipping" data-order="${escapeHtml(order.order_no)}">${['待出貨','已出貨','已完成'].map(s=>`<option ${s===order[key]?'selected':''}>${s}</option>`).join('')}</select>`;
   if (key === 'items') return escapeHtml((order.items||[]).map(i=>`${i.name} × ${i.qty}`).join('、'));
   if (key === 'shipping_method') return escapeHtml(shippingMethodText(order[key]));
-  if (key === 'shipping_details') return escapeHtml(shippingDetailsText(order));
+  if (key === 'shipping_details') {
+    const details=escapeHtml(shippingDetailsText(order));
+    const supported=['711','family'].includes(order.shipping_method);
+    const paymentEligible=order.payment_status==='已付款' || (order.payment_method==='bank' && order.payment_status==='已匯款待確認');
+    const canCreate=supported && paymentEligible && !order.logistics_trade_no;
+    const action=canCreate ? `<button class="row-button logistics-create" data-order="${escapeHtml(order.order_no)}">建立綠界物流單</button>` : '';
+    const logistics=order.logistics_trade_no ? `<div class="cell-sub">物流編號：${escapeHtml(order.logistics_trade_no)}${order.logistics_status?` · ${escapeHtml(order.logistics_status)}`:''}</div>` : '';
+    return `${details}${logistics}${action}`;
+  }
   if (['order_amount','product_cost','product_amount','discount_amount','shipping_fee','gross_profit'].includes(key)) return money(order[key]);
   if (key.endsWith('_at') || key === 'transfer_time') return order[key] ? new Date(order[key]).toLocaleString('zh-TW') : '—';
   return escapeHtml(order[key] ?? '—');
@@ -340,6 +348,8 @@ $('#chooseOrderColumns').addEventListener('click',()=>$('#orderColumnPicker').cl
 $('#orderReportMonth').addEventListener('change',renderOrderSummary);
 $('#orderColumnPicker').addEventListener('change',()=>{const values=[...$('#orderColumnPicker').querySelectorAll(':checked')].map(i=>i.value);if(!values.length)return toast('至少保留一個欄位');localStorage.setItem(ORDER_COLUMN_KEY,JSON.stringify(values));renderOrders();});
 $('#orderRows').addEventListener('change',async event=>{if(!event.target.matches('.order-status'))return;const order=state.data.orders.find(o=>o.order_no===event.target.dataset.order);if(!order)return;const body={orderNo:order.order_no,paymentStatus:event.target.dataset.kind==='payment'?event.target.value:order.payment_status,shippingStatus:event.target.dataset.kind==='shipping'?event.target.value:order.shipping_status};setSaving(true);try{const response=await fetch('/.netlify/functions/order-status-sync',{method:'POST',headers:{'Content-Type':'application/json',Authorization:`Bearer ${state.token}`},body:JSON.stringify(body)});const text=await response.text();let result={};try{result=text?JSON.parse(text):{};}catch{result={error:text};}if(!response.ok)throw new Error(result.error||'狀態更新失敗');state.data=await cloudLoad();renderOrders();toast('訂單與試算表已同步');}catch(error){renderOrders();toast(error.message||'狀態更新失敗');}finally{setSaving(false);}});
+
+$('#orderRows').addEventListener('click',async event=>{const button=event.target.closest('.logistics-create');if(!button)return;if(!confirm(`確定要為訂單 ${button.dataset.order} 建立綠界物流單嗎？`))return;button.disabled=true;setSaving(true);try{const response=await fetch('/.netlify/functions/ecpay-logistics-create',{method:'POST',headers:{'Content-Type':'application/json',Authorization:`Bearer ${state.token}`},body:JSON.stringify({orderNo:button.dataset.order})});const text=await response.text();let result={};try{result=text?JSON.parse(text):{};}catch{result={error:text};}if(!response.ok)throw new Error(result.error||'建立綠界物流單失敗');state.data=await cloudLoad();renderOrders();toast('綠界物流單建立完成');}catch(error){button.disabled=false;toast(error.message||'建立綠界物流單失敗');}finally{setSaving(false);}});
 
 $('#primaryAction').addEventListener('click', () => state.page==='products'?openProduct():state.page==='discounts'?openDiscount():openCampaign());
 $('#closeModal').addEventListener('click', closeModal); $('#cancelModal').addEventListener('click', closeModal);
