@@ -74,6 +74,9 @@ assert.ok(reconcileMigration.includes('add column if not exists') && reconcileMi
 const statusSync = readFileSync(new URL('../netlify/functions/order-status-sync.js', import.meta.url), 'utf8');
 const orderCreate = readFileSync(new URL('../netlify/functions/order-create.js', import.meta.url), 'utf8');
 const ecpayCheckout = readFileSync(new URL('../netlify/functions/ecpay-checkout.js', import.meta.url), 'utf8');
+const ecpayLogisticsCreate = readFileSync(new URL('../netlify/functions/ecpay-logistics-create.js', import.meta.url), 'utf8');
+const ecpayLogisticsCallback = readFileSync(new URL('../netlify/functions/ecpay-logistics-callback.js', import.meta.url), 'utf8');
+const logisticsMigration = readFileSync(new URL('../supabase/migrations/20260827000000_ecpay_logistics.sql', import.meta.url), 'utf8');
 const sheetScript = readFileSync(new URL('../google-apps-script/order-fields.gs', import.meta.url), 'utf8');
 assert.ok(sheetScript.includes("request.action === 'upsertOrder'") && sheetScript.includes('notifyNewServerOrder_'), '只有正式新建訂單可寄送確認信');
 assert.ok(sheetScript.includes("headers.indexOf('訂單編號')") && sheetScript.includes('sheets[0]'), 'Apps Script 必須能辨識既有訂單工作表');
@@ -88,6 +91,12 @@ assert.ok(statusSync.includes('event.headers.Authorization'), 'Netlify 管理員
 assert.ok(orderHelper.includes("responseText !== 'OK'"), 'Google Sheet webhook 必須檢查 Apps Script 回應內容');
 assert.ok(orderHelper.includes("apikey: SUPABASE_KEY") && !orderHelper.includes('Bearer ${SUPABASE_KEY}'), 'sb_secret_ 只能作為 apikey');
 assert.ok(ecpayReturn.includes("params.RtnCode === '1'") && ecpayReturn.includes('expected_amount'), '綠界成功及金額驗證後才可建立訂單');
+assert.ok(ecpayReturn.includes('orders?order_no=eq.') && ecpayReturn.includes("body: '1|OK'") && ecpayReturn.includes('existing[0].order_amount'), '綠界重複或模擬付款通知必須依既有訂單金額安全地回覆 1|OK');
 assert.ok(orderCreate.includes('await validateProductPricing') && ecpayCheckout.includes('await validateProductPricing'), '匯款建單與綠界付款初始化都必須驗證後台商品價格');
 assert.ok(ecpayCheckout.includes('payload: validatedPayload'), '綠界付款完成後必須使用付款初始化時驗證過的商品快照');
 assert.ok(checkout.includes('async function requestEcpaySignature') && checkout.includes('!response.ok || !result.CheckMacValue'), '結帳頁必須攔截後端價格驗證與簽章錯誤');
+assert.ok(app.includes("data-create-logistics") && app.includes("/.netlify/functions/ecpay-logistics-create"), '後台訂單必須能建立綠界物流單');
+assert.ok(ecpayLogisticsCreate.includes("FAMIC2C") && ecpayLogisticsCreate.includes("UNIMARTC2C") && ecpayLogisticsCreate.includes('ReceiverStoreID'), '綠界物流建單必須帶入超商類型與收件門市');
+assert.ok(ecpayLogisticsCreate.includes('ReceiverName') && ecpayLogisticsCreate.includes('ReceiverCellPhone') && ecpayLogisticsCreate.includes('ReceiverEmail'), '綠界物流建單必須帶入完整收件人資訊');
+assert.ok(ecpayLogisticsCallback.includes("body: '1|OK'") && ecpayLogisticsCallback.includes('CheckMacValue'), '綠界物流回呼必須驗證簽章並回覆 1|OK');
+assert.ok(logisticsMigration.includes('logistics_trade_no') && logisticsMigration.includes('logistics_status'), '資料庫必須保存綠界物流編號與狀態');
