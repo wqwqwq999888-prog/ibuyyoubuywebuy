@@ -213,7 +213,7 @@ function orderCell(order, key) {
   if (key === 'shipping_method') return escapeHtml(shippingMethodText(order[key]));
   if (key === 'shipping_details') {
     const details=escapeHtml(shippingDetailsText(order));
-    const supported=['711','family'].includes(order.shipping_method);
+    const supported=['711','family','kuroneko'].includes(order.shipping_method);
     const paymentEligible=order.payment_status==='已付款' || (order.payment_method==='bank' && order.payment_status==='已匯款待確認');
     const canCreate=supported && paymentEligible && !order.logistics_trade_no;
     const action=canCreate ? `<button class="row-button logistics-create" data-order="${escapeHtml(order.order_no)}">建立綠界物流單</button>` : '';

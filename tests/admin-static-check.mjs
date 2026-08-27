@@ -76,3 +76,5 @@ assert.ok(ecpayReturn.includes("params.RtnCode === '1'") && ecpayReturn.includes
 assert.ok(app.includes('建立綠界物流單') && app.includes('/.netlify/functions/ecpay-logistics-create'), '配送資料欄必須能建立綠界物流單');
 assert.ok(app.includes("order.payment_status==='已付款'") && app.includes("order.payment_method==='bank'") && app.includes("order.payment_status==='已匯款待確認'"), '物流按鈕必須支援已付款與已送出匯款資料的銀行匯款訂單');
 assert.ok(app.includes('!order.logistics_trade_no'), '已建立物流單的訂單不得再次顯示物流按鈕');
+assert.ok(app.includes("['711','family','kuroneko']"), '綠界物流按鈕必須支援超商與黑貓宅配');
+assert.ok(checkout.includes("zipcode: document.getElementById('zipcode')"), '宅配訂單必須保存郵遞區號');
