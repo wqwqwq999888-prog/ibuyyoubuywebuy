@@ -14,6 +14,10 @@ function ecpayEncode(str) {
     .replace(/%20/g, '+');
 }
 
+function ecpayText(value, maxLength) {
+  return String(value || '').replace(/[\u0000-\u001f]/g, ' ').trim().slice(0, maxLength);
+}
+
 exports.handler = async (event) => {
   if (event.httpMethod === 'OPTIONS') {
     return {
@@ -35,7 +39,7 @@ exports.handler = async (event) => {
   const HASH_IV = process.env.ECPAY_HASH_IV;
 
   const request = JSON.parse(event.body || '{}');
-  const params = request.params || request;
+  let params = request.params || request;
   if (request.order) {
     const pending = normalizeOrder(request.order, '待付款');
     if (pending.order_no !== params.MerchantTradeNo || Number(params.TotalAmount) !== pending.order_amount) {
@@ -45,7 +49,19 @@ exports.handler = async (event) => {
       method: 'POST', headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
       body: JSON.stringify({ order_no: pending.order_no, payload: request.order, expected_amount: pending.order_amount })
     });
+    const payerName = ecpayText(pending.customer_name, 40);
+    const payerPhone = ecpayText(pending.customer_phone, 40);
+    const payerEmail = ecpayText(pending.customer_email, 50);
+    params = {
+      ...params,
+      TradeDesc: ecpayText(`鬥陣買肉乾｜付款人：${payerName}｜電話：${payerPhone}`, 200),
+      CustomField1: ecpayText(`付款人：${payerName}`, 50),
+      CustomField2: ecpayText(`電話：${payerPhone}`, 50),
+      CustomField3: ecpayText(`Email：${payerEmail}`, 50),
+      CustomField4: ecpayText(`訂單：${pending.order_no}`, 50)
+    };
   }
+  delete params.CheckMacValue;
 
   const sorted = Object.keys(params).sort((a, b) =>
     a.toLowerCase().localeCompare(b.toLowerCase())
@@ -66,6 +82,6 @@ exports.handler = async (event) => {
       'Content-Type': 'application/json',
       'Access-Control-Allow-Origin': '*',
     },
-    body: JSON.stringify({ CheckMacValue: checkMacValue }),
+    body: JSON.stringify({ params, CheckMacValue: checkMacValue }),
   };
 };
