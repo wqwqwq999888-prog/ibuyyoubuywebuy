@@ -1,14 +1,10 @@
 # 商店管理後台
 
-這個目錄是獨立的新後台，不會取代或修改目前的 `index.html`、`checkout.html`，因此現有官網仍依原本資料運作。
+這個目錄是正式管理後台。雲端模式會直接修改 Supabase 資料；商品異動會在官網重新載入後反映，訂單狀態異動也會同步至 Google Sheet。
 
-## 最簡單的本地操作方式（不需要終端機）
+## 正式操作方式
 
-1. 打開 repository 資料夾。
-2. 直接雙擊根目錄的 `開啟管理後台.html`。
-3. 瀏覽器會自動開啟白色管理後台。
-
-後台已改用一般 JavaScript，不需要先架設網站伺服器；商品新增、修改、圖片預覽、物流設定、折扣與團購都可以直接在本機檔案模式操作。
+請由 `https://douzhenmai.com/admin/` 登入正式後台。正式設定的 `admin/config.js` 使用 `supabase` 模式，儲存會直接修改雲端資料；不要用正式帳號把測試資料當成商品上架。
 
 ## 使用本地伺服器預覽（開發人員選用）
 
@@ -18,7 +14,7 @@
 python -m http.server 8080
 ```
 
-開啟 `http://localhost:8080/admin/`。`config.js` 預設為 `local`，資料會保存在這台瀏覽器的 `localStorage`；這只適合介面測試，清除瀏覽器資料後會恢復預設資料。
+開啟 `http://localhost:8080/admin/`。Repository 目前預設仍是正式 `supabase` 模式；若只要測試介面，請在獨立開發 branch 將 `admin/config.js` 暫時改成 `mode: 'local'`，且不可把這項暫時設定合併至正式分支。
 
 ## 「本地操作模式」是什麼？
 
@@ -28,11 +24,11 @@ python -m http.server 8080
 - 不會出現在正式官網，也不會影響客人下單。
 - 目前不需要管理員帳號或密碼。
 - 清除這個網站的瀏覽器資料後，會恢復最初預載的 11 項商品。
-- 等您確認操作方式與畫面後，才會連接正式 Supabase 雲端資料庫。
+- 只有在開發 branch 明確將 `mode` 改為 `local` 時，以下行為才成立；正式後台已連接 Supabase。
 
 本地模式已預載目前 8 項單包與 3 項組合商品。組合與單包使用完全相同的商品資料格式，沒有獨立的組合管理功能。
 
-## 正式雲端模式（尚未部署）
+## 正式雲端模式
 
 1. 建立 Supabase 專案。
 2. 執行 `supabase/migrations/20260824000000_admin_backend.sql`。
@@ -83,8 +79,10 @@ window.ADMIN_CONFIG = {
 
 Netlify 正式環境需設定 `SUPABASE_URL`、`SUPABASE_SECRET_KEY`、`GOOGLE_SHEET_WEBHOOK_URL`、`GOOGLE_SHEET_WEBHOOK_SECRET`、`ECPAY_HASH_KEY`、`ECPAY_HASH_IV`。`sb_secret_` 僅由 server-side function 放在 `apikey` header，絕不可作為 Bearer JWT。請在 Apps Script 的 Script Properties 設定同一份 `WEBHOOK_SECRET`，不要寫入 repository 或貼在對話中。
 
+綠界超商物流自動建單另需設定 `ECPAY_LOGISTICS_SENDER_NAME`、`ECPAY_LOGISTICS_SENDER_PHONE`，並執行 `supabase/migrations/20260827000000_ecpay_logistics.sql`。如物流使用與金流不同的商店代號，再設定 `ECPAY_MERCHANT_ID`；測試環境可用 `ECPAY_LOGISTICS_CREATE_URL` 指定綠界測試 API。建立物流單前必須先確認付款，且目前自動建單支援 7-ELEVEN 與全家店到店。
+
 請先以正式專案 `astounding-rabanadas-a0a6e1` 的 Deploy Preview 驗收；驗收前不要合併，也不要部署到 Production。不得操作 `merry-biscuit-5014fe`。
 
-## 尚未影響官網的部分
+## 官網同步範圍
 
-目前官網尚未改讀雲端商品、物流、折扣或團購資料。因此在後台本地操作或未來先建立雲端資料，都不會改變客人目前看到的商品及結帳流程。等後台資料驗收完成後，才會另行把官網切換至後端 API。
+官網首頁與結帳頁會透過 Supabase 公開唯讀權限載入已上架商品；後台修改商品名稱、價格、規格、說明、圖片、分類、排序或上下架後，前台重新載入即可同步。結帳頁會沿用首頁本次瀏覽取得的商品目錄快照，避免顧客加入購物車後因後台調整排序而對應到其他商品。物流、折扣與團購設定仍由既有結帳流程及伺服器端驗證處理。

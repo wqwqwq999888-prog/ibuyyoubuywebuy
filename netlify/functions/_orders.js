@@ -35,6 +35,37 @@ function normalizeOrder(data, paymentStatus) {
   };
 }
 
+async function validateProductPricing(order) {
+  const requested = new Map();
+  for (const item of order.items) {
+    const productNo = String(item.productNo || '');
+    const qty = Number(item.qty);
+    if (!/^\d+$/.test(productNo) || !Number.isInteger(qty) || qty < 1 || qty > 99) throw new Error('商品資料或數量錯誤');
+    requested.set(productNo, (requested.get(productNo) || 0) + qty);
+  }
+
+  const productNos = [...requested.keys()];
+  const products = await supabase(`products?product_no=in.(${productNos.map(encodeURIComponent).join(',')})&enabled=eq.true&select=product_no,name,price`);
+  if (products.length !== productNos.length) throw new Error('購物車包含已下架或不存在的商品，請重新整理後再試');
+
+  const byNo = Object.fromEntries(products.map(product => [String(product.product_no), product]));
+  order.items = productNos.map(productNo => {
+    const product = byNo[productNo];
+    return { productNo, name: String(product.name), price: Number(product.price), qty: requested.get(productNo) };
+  });
+  const productAmount = order.items.reduce((total, item) => total + item.price * item.qty, 0);
+  const discountAmount = Number(order.discount_amount);
+  const shippingFee = Number(order.shipping_fee);
+  if (discountAmount < 0 || discountAmount > productAmount || shippingFee < 0) throw new Error('折扣或運費金額錯誤');
+  const expectedTotal = productAmount - discountAmount + shippingFee;
+  if (order.product_amount !== productAmount || order.order_amount !== expectedTotal) {
+    throw new Error('商品價格已更新，請重新整理購物車後再下單');
+  }
+  order.product_amount = productAmount;
+  order.order_amount = expectedTotal;
+  return order;
+}
+
 async function addProductCosts(order) {
   const productNos = [...new Set(order.items.map(item => String(item.productNo || '')).filter(Boolean))];
   if (!productNos.length) return order;
@@ -56,4 +87,4 @@ async function syncSheet(order, action = 'upsertOrder') {
   if (!response.ok || responseText !== 'OK') throw new Error(`Google Sheet sync ${response.status}: ${responseText}`);
 }
 
-module.exports = { supabase, normalizeOrder, addProductCosts, syncSheet };
+module.exports = { supabase, normalizeOrder, validateProductPricing, addProductCosts, syncSheet };

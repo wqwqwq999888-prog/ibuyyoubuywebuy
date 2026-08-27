@@ -206,12 +206,19 @@ function shippingDetailsText(order) {
   if(order.shipping_method==='family') return [`全家：${details.storefamily||''}`,details.storefamilyAddress||''].filter(Boolean).join('／');
   return [details.city||'',details.address||''].filter(Boolean).join(' ') || '—';
 }
+
+function logisticsAction(order) {
+  if (!['711','family'].includes(order.shipping_method)) return '';
+  if (order.logistics_trade_no) return `<div class="cell-sub">綠界物流編號：${escapeHtml(order.logistics_trade_no)}<br>${escapeHtml(order.logistics_message || order.logistics_status || '')}</div>`;
+  if (order.payment_status !== '已付款') return '<div class="cell-sub">確認付款後可建立物流單</div>';
+  return `<button class="row-button" data-create-logistics="${escapeHtml(order.order_no)}">建立綠界物流單</button>`;
+}
 function orderCell(order, key) {
   if (key === 'payment_status') return `<select class="order-status" data-kind="payment" data-order="${escapeHtml(order.order_no)}">${['待付款','已付款','已匯款待確認','付款失敗'].map(s=>`<option ${s===order[key]?'selected':''}>${s}</option>`).join('')}</select>`;
   if (key === 'shipping_status') return `<select class="order-status" data-kind="shipping" data-order="${escapeHtml(order.order_no)}">${['待出貨','已出貨','已完成'].map(s=>`<option ${s===order[key]?'selected':''}>${s}</option>`).join('')}</select>`;
   if (key === 'items') return escapeHtml((order.items||[]).map(i=>`${i.name} × ${i.qty}`).join('、'));
   if (key === 'shipping_method') return escapeHtml(shippingMethodText(order[key]));
-  if (key === 'shipping_details') return escapeHtml(shippingDetailsText(order));
+  if (key === 'shipping_details') return `${escapeHtml(shippingDetailsText(order))}${logisticsAction(order)}`;
   if (['order_amount','product_cost','product_amount','discount_amount','shipping_fee','gross_profit'].includes(key)) return money(order[key]);
   if (key.endsWith('_at') || key === 'transfer_time') return order[key] ? new Date(order[key]).toLocaleString('zh-TW') : '—';
   return escapeHtml(order[key] ?? '—');
@@ -340,6 +347,7 @@ $('#chooseOrderColumns').addEventListener('click',()=>$('#orderColumnPicker').cl
 $('#orderReportMonth').addEventListener('change',renderOrderSummary);
 $('#orderColumnPicker').addEventListener('change',()=>{const values=[...$('#orderColumnPicker').querySelectorAll(':checked')].map(i=>i.value);if(!values.length)return toast('至少保留一個欄位');localStorage.setItem(ORDER_COLUMN_KEY,JSON.stringify(values));renderOrders();});
 $('#orderRows').addEventListener('change',async event=>{if(!event.target.matches('.order-status'))return;const order=state.data.orders.find(o=>o.order_no===event.target.dataset.order);if(!order)return;const body={orderNo:order.order_no,paymentStatus:event.target.dataset.kind==='payment'?event.target.value:order.payment_status,shippingStatus:event.target.dataset.kind==='shipping'?event.target.value:order.shipping_status};setSaving(true);try{const response=await fetch('/.netlify/functions/order-status-sync',{method:'POST',headers:{'Content-Type':'application/json',Authorization:`Bearer ${state.token}`},body:JSON.stringify(body)});const text=await response.text();let result={};try{result=text?JSON.parse(text):{};}catch{result={error:text};}if(!response.ok)throw new Error(result.error||'狀態更新失敗');state.data=await cloudLoad();renderOrders();toast('訂單與試算表已同步');}catch(error){renderOrders();toast(error.message||'狀態更新失敗');}finally{setSaving(false);}});
+$('#orderRows').addEventListener('click',async event=>{const button=event.target.closest('[data-create-logistics]');if(!button)return;const orderNo=button.dataset.createLogistics;if(!confirm(`確定要為訂單 ${orderNo} 建立綠界物流單嗎？建立後不可重複送出。`))return;button.disabled=true;setSaving(true);try{const response=await fetch('/.netlify/functions/ecpay-logistics-create',{method:'POST',headers:{'Content-Type':'application/json',Authorization:`Bearer ${state.token}`},body:JSON.stringify({orderNo})});const result=await response.json();if(!response.ok)throw new Error(result.error||'綠界物流單建立失敗');state.data=await cloudLoad();renderOrders();toast(result.existing?'此訂單已有綠界物流單':'綠界物流單已建立');}catch(error){toast(error.message||'綠界物流單建立失敗');button.disabled=false;}finally{setSaving(false);}});
 
 $('#primaryAction').addEventListener('click', () => state.page==='products'?openProduct():state.page==='discounts'?openDiscount():openCampaign());
 $('#closeModal').addEventListener('click', closeModal); $('#cancelModal').addEventListener('click', closeModal);
