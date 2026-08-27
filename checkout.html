@@ -934,6 +934,7 @@ async function submitOrder() {
       storefamilyId: document.getElementById('storefamilyId')?.value || '',
       storefamilyAddress: document.getElementById('storefamilyAddress')?.value || '',
       city: document.getElementById('city')?.value || '',
+      zipcode: document.getElementById('zipcode')?.value || '',
       address: document.getElementById('address')?.value || '',
     },
     payment: selectedPayment,
@@ -1010,7 +1011,9 @@ async function submitOrder() {
       body: JSON.stringify({ params, order: { ...orderData, orderId: params.MerchantTradeNo } })
     });
     const data = await res.json();
-    params.CheckMacValue = data.CheckMacValue;
+    if (!res.ok || !data.params || !data.CheckMacValue) throw new Error(data.error || '付款參數建立失敗');
+    Object.keys(params).forEach(key => delete params[key]);
+    Object.assign(params, data.params, { CheckMacValue: data.CheckMacValue });
   } catch(e) {
     document.getElementById('orderLoading').hidden = true;
     btn.disabled = false;
@@ -1209,6 +1212,7 @@ function showToast(msg) {
       storefamilyId: document.getElementById('storefamilyId')?.value || '',
       storefamilyAddress: document.getElementById('storefamilyAddress')?.value || '',
       city: document.getElementById('city')?.value || '',
+      zipcode: document.getElementById('zipcode')?.value || '',
       address: document.getElementById('address')?.value || '',
     },
     payment: 'credit',
@@ -1251,7 +1255,9 @@ function showToast(msg) {
       body: JSON.stringify({ params, order: orderData })
     });
     const data = await res.json();
-    params.CheckMacValue = data.CheckMacValue;
+    if (!res.ok || !data.params || !data.CheckMacValue) throw new Error(data.error || '付款參數建立失敗');
+    Object.keys(params).forEach(key => delete params[key]);
+    Object.assign(params, data.params, { CheckMacValue: data.CheckMacValue });
   } catch(e) {
     showToast('付款初始化失敗，請稍後再試');
     return;

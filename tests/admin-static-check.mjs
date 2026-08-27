@@ -14,7 +14,7 @@ for (const label of ['商品管理', '物流管理', '折扣管理', '團購管�
   assert.ok(html.includes(label), `後台缺少「${label}」`);
 }
 
-assert.ok(html.includes('<script src="app.js"></script>'), 'app.js 必須能在直接開啟檔案時執行');
+assert.match(html, /<script src="app\.js\?v=[^"]+"><\/script>/, 'app.js 必須有部署版本碼，避免後台持續使用舊快取');
 assert.ok(!html.includes('type="module"'), '本地預覽不應依賴 module HTTP 載入');
 assert.ok(launcher.includes('url=admin/index.html'), '根目錄啟動頁必須導向後台');
 assert.ok(app.includes("free_threshold: 1500"), '超商免運門檻預設值應為 1500');
@@ -44,6 +44,7 @@ const migration = readFileSync(new URL('../supabase/migrations/20260825000000_or
 const reconcileMigration = readFileSync(new URL('../supabase/migrations/20260825020000_reconcile_order_columns.sql', import.meta.url), 'utf8');
 const orderHelper = readFileSync(new URL('../netlify/functions/_orders.js', import.meta.url), 'utf8');
 const ecpayReturn = readFileSync(new URL('../netlify/functions/ecpay-return.js', import.meta.url), 'utf8');
+const ecpayCheckout = readFileSync(new URL('../netlify/functions/ecpay-checkout.js', import.meta.url), 'utf8');
 assert.ok(html.includes('訂單管理') && app.includes('ORDER_COLUMNS'), '後台必須提供 24 欄訂單管理');
 assert.equal((app.match(/\['[^']+','[^']+'\]/g) || []).filter(value => ORDER_COLUMN_NAMES.some(name => value.includes(`'${name}'`))).length, 24, '訂單欄位必須是 24 欄');
 assert.ok(checkout.includes('id="emailMarketingConsent"') && checkout.includes('emailMarketingConsent').valueOf(), 'Email 行銷同意必須獨立存在');
@@ -73,3 +74,12 @@ assert.ok(statusSync.includes('event.headers.Authorization'), 'Netlify 管理員
 assert.ok(orderHelper.includes("responseText !== 'OK'"), 'Google Sheet webhook 必須檢查 Apps Script 回應內容');
 assert.ok(orderHelper.includes("apikey: SUPABASE_KEY") && !orderHelper.includes('Bearer ${SUPABASE_KEY}'), 'sb_secret_ 只能作為 apikey');
 assert.ok(ecpayReturn.includes("params.RtnCode === '1'") && ecpayReturn.includes('expected_amount'), '綠界成功及金額驗證後才可建立訂單');
+assert.ok(app.includes('建立綠界物流單') && app.includes('/.netlify/functions/ecpay-logistics-create'), '配送資料欄必須能建立綠界物流單');
+assert.ok(app.includes("order.payment_status==='已付款'") && app.includes("order.payment_method==='bank'") && app.includes("order.payment_status==='已匯款待確認'"), '物流按鈕必須支援已付款與已送出匯款資料的銀行匯款訂單');
+assert.ok(app.includes('!order.logistics_trade_no'), '已建立物流單的訂單不得再次顯示物流按鈕');
+assert.ok(app.includes("['711','family','kuroneko']"), '綠界物流按鈕必須支援超商與黑貓宅配');
+assert.ok(!app.includes('<th>物流操作</th>') && app.includes("key === 'shipping_details'") && app.includes('logistics-create'), '物流建單按鈕必須維持在使用者勾選的配送資料欄');
+assert.ok(checkout.includes("zipcode: document.getElementById('zipcode')"), '宅配訂單必須保存郵遞區號');
+assert.ok(ecpayCheckout.includes('CustomField1') && ecpayCheckout.includes('CustomField2') && ecpayCheckout.includes('CustomField3'), '綠界金流必須帶入付款人姓名、電話與 Email');
+assert.ok(ecpayCheckout.includes('付款人：${payerName}') && ecpayCheckout.includes('電話：${payerPhone}'), '綠界交易描述必須能直接辨識付款人');
+assert.ok(checkout.includes('Object.assign(params, data.params'), '前端必須提交 server 簽署後的完整付款參數');

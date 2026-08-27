@@ -1,69 +1,31 @@
-name: Fix checkout combo products
+name: Verify checkout and ECPay integrations
 
 on:
   push:
     branches: [main]
-    paths:
-      - '.github/workflows/fix-checkout-combos.yml'
+  pull_request:
+    branches: [main]
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
-  fix-checkout:
+  checks:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Patch checkout combo support
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Run repository checks
         shell: bash
         run: |
-          python - <<'PY'
-          from pathlib import Path
-
-          path = Path('checkout.html')
-          text = path.read_text(encoding='utf-8')
-
-          if 'const CHECKOUT_COMBOS = [' in text:
-              print('Combo compatibility patch already present.')
-          else:
-              marker = 'let cart = {};'
-              if marker not in text:
-                  raise SystemExit('Could not find checkout cart marker; refusing to modify file.')
-
-              patch = r'''
-// ── COMBO PRODUCTS COMPATIBILITY ──
-// Keep checkout.html compatible with combo cart keys created by index.html.
-// Homepage cart keys 0..7 are individual flavors; 8..10 are combo products.
-const CHECKOUT_COMBOS = [
-  { name: '全家大小都會愛', price: 585, fallbackFlavor: 0 },
-  { name: '就愛火辣辣', price: 585, fallbackFlavor: 0 },
-  { name: '老饕私藏限定', price: 655, fallbackFlavor: 0 }
-];
-
-CHECKOUT_COMBOS.forEach(c => {
-  const fallback = FLAVORS_DATA[c.fallbackFlavor] || FLAVORS_DATA[0];
-  FLAVORS_DATA.push({ name: c.name, price: c.price });
-  if (fallback && typeof FLAVOR_IMGS !== 'undefined' && FLAVOR_IMGS[fallback.name]) {
-    FLAVOR_IMGS[c.name] = FLAVOR_IMGS[fallback.name];
-  }
-});
-'''
-              text = text.replace(marker, patch + '\n' + marker, 1)
-              path.write_text(text, encoding='utf-8')
-              print('checkout.html patched successfully.')
-          PY
-
-      - name: Commit checkout fix
-        shell: bash
-        run: |
-          if git diff --quiet -- checkout.html; then
-            echo "No checkout changes needed."
-            exit 0
-          fi
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add checkout.html
-          git commit -m "Fix checkout totals for combo products"
-          git push
+          set -e
+          for test in tests/*.cjs; do node "$test"; done
+          for test in tests/*.mjs; do node "$test"; done
+          for file in netlify/functions/*.js admin/app.js; do node --check "$file"; done
+          git diff --check
