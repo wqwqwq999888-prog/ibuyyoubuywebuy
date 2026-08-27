@@ -78,6 +78,7 @@ assert.ok(app.includes('建立綠界物流單') && app.includes('/.netlify/funct
 assert.ok(app.includes("order.payment_status==='已付款'") && app.includes("order.payment_method==='bank'") && app.includes("order.payment_status==='已匯款待確認'"), '物流按鈕必須支援已付款與已送出匯款資料的銀行匯款訂單');
 assert.ok(app.includes('!order.logistics_trade_no'), '已建立物流單的訂單不得再次顯示物流按鈕');
 assert.ok(app.includes("['711','family','kuroneko']"), '綠界物流按鈕必須支援超商與黑貓宅配');
+assert.ok(app.includes('<th>物流操作</th>') && app.includes('logisticsActionCell(order)'), '物流建單必須使用固定操作欄，不可因配送資料欄被隱藏而消失');
 assert.ok(checkout.includes("zipcode: document.getElementById('zipcode')"), '宅配訂單必須保存郵遞區號');
 assert.ok(ecpayCheckout.includes('CustomField1') && ecpayCheckout.includes('CustomField2') && ecpayCheckout.includes('CustomField3'), '綠界金流必須帶入付款人姓名、電話與 Email');
 assert.ok(ecpayCheckout.includes('付款人：${payerName}') && ecpayCheckout.includes('電話：${payerPhone}'), '綠界交易描述必須能直接辨識付款人');

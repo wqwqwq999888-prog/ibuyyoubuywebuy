@@ -48,7 +48,12 @@ exports.handler = async (event) => {
       if (!pending.length || Number(params.TradeAmt) !== pending[0].expected_amount) return { statusCode: 200, body: '0|AmountError' };
       const order = await addProductCosts(normalizeOrder({ ...pending[0].payload, tradeNo: params.TradeNo }, '已付款'));
       const created = await supabase('orders?on_conflict=order_no', { method: 'POST', headers: { Prefer: 'resolution=ignore-duplicates,return=representation' }, body: JSON.stringify(order) });
-      if (created.length) await syncSheet(created[0]);
+      // The order is already safely recorded at this point. Sheet/email is an
+      // ancillary integration and must never make ECPay retry a paid order.
+      if (created?.length) {
+        try { await syncSheet(created[0]); }
+        catch (error) { console.error('付款訂單已建立，但 Sheet/Email 同步失敗:', error); }
+      }
       await supabase(`pending_ecpay_orders?order_no=eq.${encodeURIComponent(orderId)}`, { method: 'DELETE' });
     } catch(e) {
       console.error('建立付款訂單失敗:', e);
