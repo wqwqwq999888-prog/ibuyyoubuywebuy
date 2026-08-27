@@ -206,17 +206,6 @@ function shippingDetailsText(order) {
   if(order.shipping_method==='family') return [`全家：${details.storefamily||''}`,details.storefamilyAddress||''].filter(Boolean).join('／');
   return [details.city||'',details.address||''].filter(Boolean).join(' ') || '—';
 }
-function canCreateLogistics(order) {
-  const supported=['711','family','kuroneko'].includes(order.shipping_method);
-  const paymentEligible=order.payment_status==='已付款' || (order.payment_method==='bank' && order.payment_status==='已匯款待確認');
-  return supported && paymentEligible && !order.logistics_trade_no;
-}
-function logisticsActionCell(order) {
-  if (canCreateLogistics(order)) return `<button class="row-button logistics-create" data-order="${escapeHtml(order.order_no)}">建立綠界物流單</button>`;
-  if (order.logistics_trade_no) return `<div>物流編號：${escapeHtml(order.logistics_trade_no)}</div><div class="cell-sub">${escapeHtml(order.logistics_status || '已建立')}</div>`;
-  if (!['711','family','kuroneko'].includes(order.shipping_method)) return '<span class="cell-sub">此配送方式不支援</span>';
-  return '<span class="cell-sub">確認付款後可建立</span>';
-}
 function orderCell(order, key) {
   if (key === 'payment_status') return `<select class="order-status" data-kind="payment" data-order="${escapeHtml(order.order_no)}">${['待付款','已付款','已匯款待確認','付款失敗'].map(s=>`<option ${s===order[key]?'selected':''}>${s}</option>`).join('')}</select>`;
   if (key === 'shipping_status') return `<select class="order-status" data-kind="shipping" data-order="${escapeHtml(order.order_no)}">${['待出貨','已出貨','已完成'].map(s=>`<option ${s===order[key]?'selected':''}>${s}</option>`).join('')}</select>`;
@@ -224,8 +213,12 @@ function orderCell(order, key) {
   if (key === 'shipping_method') return escapeHtml(shippingMethodText(order[key]));
   if (key === 'shipping_details') {
     const details=escapeHtml(shippingDetailsText(order));
+    const supported=['711','family','kuroneko'].includes(order.shipping_method);
+    const paymentEligible=order.payment_status==='已付款' || (order.payment_method==='bank' && order.payment_status==='已匯款待確認');
+    const canCreate=supported && paymentEligible && !order.logistics_trade_no;
+    const action=canCreate ? `<div class="cell-sub"><button class="row-button logistics-create" data-order="${escapeHtml(order.order_no)}">建立綠界物流單</button></div>` : '';
     const logistics=order.logistics_trade_no ? `<div class="cell-sub">物流編號：${escapeHtml(order.logistics_trade_no)}${order.logistics_status?` · ${escapeHtml(order.logistics_status)}`:''}</div>` : '';
-    return `${details}${logistics}`;
+    return `${details}${logistics}${action}`;
   }
   if (['order_amount','product_cost','product_amount','discount_amount','shipping_fee','gross_profit'].includes(key)) return money(order[key]);
   if (key.endsWith('_at') || key === 'transfer_time') return order[key] ? new Date(order[key]).toLocaleString('zh-TW') : '—';
@@ -233,8 +226,8 @@ function orderCell(order, key) {
 }
 function renderOrders() {
   const visible=selectedOrderColumns(); const columns=ORDER_COLUMNS.filter(([key])=>visible.includes(key));
-  $('#orderHead').innerHTML=`<tr>${columns.map(([,label])=>`<th>${label}</th>`).join('')}<th>物流操作</th></tr>`;
-  $('#orderRows').innerHTML=(state.data.orders||[]).map(order=>`<tr>${columns.map(([key])=>`<td>${orderCell(order,key)}</td>`).join('')}<td>${logisticsActionCell(order)}</td></tr>`).join('');
+  $('#orderHead').innerHTML=`<tr>${columns.map(([,label])=>`<th>${label}</th>`).join('')}</tr>`;
+  $('#orderRows').innerHTML=(state.data.orders||[]).map(order=>`<tr>${columns.map(([key])=>`<td>${orderCell(order,key)}</td>`).join('')}</tr>`).join('');
   $('#orderEmpty').classList.toggle('hidden',(state.data.orders||[]).length>0);
   $('#orderColumnPicker').innerHTML=ORDER_COLUMNS.map(([key,label])=>`<label><input type="checkbox" value="${key}" ${visible.includes(key)?'checked':''}> ${label}</label>`).join('');
   renderOrderSummary();

@@ -45,7 +45,14 @@ exports.handler = async (event) => {
           : { statusCode: 200, body: '0|AmountError' };
       }
       const pending = await supabase(`pending_ecpay_orders?order_no=eq.${encodeURIComponent(orderId)}&select=*`);
-      if (!pending.length || Number(params.TradeAmt) !== pending[0].expected_amount) return { statusCode: 200, body: '0|AmountError' };
+      // An authentic simulation can be sent for an old/cancelled test trade
+      // after its local pending row has already been removed. Acknowledge the
+      // delivery without recreating anything so ECPay does not keep retrying.
+      if (!pending.length) {
+        console.warn('收到查無本地訂單的綠界付款通知，僅回覆 ACK:', orderId);
+        return { statusCode: 200, headers: { 'Content-Type': 'text/plain' }, body: '1|OK' };
+      }
+      if (Number(params.TradeAmt) !== Number(pending[0].expected_amount)) return { statusCode: 200, body: '0|AmountError' };
       const order = await addProductCosts(normalizeOrder({ ...pending[0].payload, tradeNo: params.TradeNo }, '已付款'));
       const created = await supabase('orders?on_conflict=order_no', { method: 'POST', headers: { Prefer: 'resolution=ignore-duplicates,return=representation' }, body: JSON.stringify(order) });
       // The order is already safely recorded at this point. Sheet/email is an
