@@ -5,3 +5,8 @@
   for = "/*"
   [headers.values]
     Access-Control-Allow-Origin = "*"
+
+[[headers]]
+  for = "/admin/app.js"
+  [headers.values]
+    Cache-Control = "no-cache, no-store, must-revalidate"

@@ -206,12 +206,13 @@ function shippingDetailsText(order) {
   if(order.shipping_method==='family') return [`全家：${details.storefamily||''}`,details.storefamilyAddress||''].filter(Boolean).join('／');
   return [details.city||'',details.address||''].filter(Boolean).join(' ') || '—';
 }
+function canCreateLogistics(order) { return ['已付款','已匯款待確認'].includes(order.payment_status) && !order.logistics_trade_no; }
 function orderCell(order, key) {
   if (key === 'payment_status') return `<select class="order-status" data-kind="payment" data-order="${escapeHtml(order.order_no)}">${['待付款','已付款','已匯款待確認','付款失敗'].map(s=>`<option ${s===order[key]?'selected':''}>${s}</option>`).join('')}</select>`;
   if (key === 'shipping_status') return `<select class="order-status" data-kind="shipping" data-order="${escapeHtml(order.order_no)}">${['待出貨','已出貨','已完成'].map(s=>`<option ${s===order[key]?'selected':''}>${s}</option>`).join('')}</select>`;
   if (key === 'items') return escapeHtml((order.items||[]).map(i=>`${i.name} × ${i.qty}`).join('、'));
   if (key === 'shipping_method') return escapeHtml(shippingMethodText(order[key]));
-  if (key === 'shipping_details') return escapeHtml(shippingDetailsText(order));
+  if (key === 'shipping_details') return `${escapeHtml(shippingDetailsText(order))}${canCreateLogistics(order)?`<br><button class="row-button" data-create-logistics="${escapeHtml(order.order_no)}">建立綠界物流單</button>`:order.logistics_trade_no?`<div class="cell-sub">物流單號：${escapeHtml(order.logistics_trade_no)}／${escapeHtml(order.logistics_message||order.logistics_status||'已建立')}</div>`:''}`;
   if (['order_amount','product_cost','product_amount','discount_amount','shipping_fee','gross_profit'].includes(key)) return money(order[key]);
   if (key.endsWith('_at') || key === 'transfer_time') return order[key] ? new Date(order[key]).toLocaleString('zh-TW') : '—';
   return escapeHtml(order[key] ?? '—');
@@ -334,6 +335,8 @@ document.addEventListener('click', async event => {
   const archive = event.target.closest('[data-archive]'); if (archive) { const item=state.data.products.find(row=>row.product_no===archive.dataset.id); if(item && confirm(`確定要封存「${item.name}」嗎？`)){await saveRecord('products',{...item,enabled:false},'product_no');state.data=isLocal?localLoad():await cloudLoad();renderAll();toast('商品已封存');} return; }
   const remove = event.target.closest('[data-delete]'); if(remove && confirm('確定要刪除這筆資料嗎？')){const table=remove.dataset.delete==='discount'?'discounts':'campaigns';await deleteRecord(table,remove.dataset.id);state.data=isLocal?localLoad():await cloudLoad();renderAll();toast('資料已刪除');return;}
   const copy = event.target.closest('[data-copy]'); if(copy){try{await navigator.clipboard.writeText(copy.dataset.copy);toast('專屬連結已複製');}catch{window.prompt('請複製這個專屬連結：',copy.dataset.copy);} }
+  const logistics = event.target.closest('[data-create-logistics]');
+  if(logistics && confirm('確定要建立綠界物流單嗎？')){setSaving(true);try{const response=await fetch('/.netlify/functions/ecpay-logistics-create',{method:'POST',headers:{'Content-Type':'application/json',Authorization:`Bearer ${state.token}`},body:JSON.stringify({orderNo:logistics.dataset.createLogistics})});const result=await response.json();if(!response.ok)throw new Error(result.error||'物流建單失敗');state.data=await cloudLoad();renderOrders();toast('綠界物流單已建立');}catch(error){toast(error.message||'物流建單失敗');}finally{setSaving(false);}return;}
 });
 
 $('#chooseOrderColumns').addEventListener('click',()=>$('#orderColumnPicker').classList.toggle('hidden'));
