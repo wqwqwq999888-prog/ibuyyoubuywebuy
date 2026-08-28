@@ -75,6 +75,7 @@ const statusSync = readFileSync(new URL('../netlify/functions/order-status-sync.
 const orderCreate = readFileSync(new URL('../netlify/functions/order-create.js', import.meta.url), 'utf8');
 const ecpayCheckout = readFileSync(new URL('../netlify/functions/ecpay-checkout.js', import.meta.url), 'utf8');
 const sheetScript = readFileSync(new URL('../google-apps-script/order-fields.gs', import.meta.url), 'utf8');
+const orderDelete = readFileSync(new URL('../netlify/functions/order-delete.js', import.meta.url), 'utf8');
 assert.ok(sheetScript.includes("request.action === 'upsertOrder'") && sheetScript.includes('notifyNewServerOrder_'), '只有正式新建訂單可寄送確認信');
 assert.ok(sheetScript.includes("headers.indexOf('訂單編號')") && sheetScript.includes('sheets[0]'), 'Apps Script 必須能辨識既有訂單工作表');
 assert.ok(sheetScript.includes("SpreadsheetApp.openById(ORDER_SPREADSHEET_ID)") && sheetScript.includes("ORDER_FROM_EMAIL = 'dzhenmai@gmail.com'"), '訂單副本與寄件人必須固定使用正式設定');
@@ -85,7 +86,7 @@ assert.ok(sheetScript.includes("'kuroneko':'黑貓宅急便'") && sheetScript.in
 assert.ok(app.includes('shippingDetailsText(order)') && !app.includes("escapeHtml(JSON.stringify(order[key]||{}))"), '後台不得直接顯示配送 JSON');
 assert.ok(orderCreate.includes('const existing = await supabase') && orderCreate.includes('sheetSynced'), '銀行匯款建單重試不可重複建立訂單，Sheet 失敗不可誤報訂單失敗');
 assert.ok(statusSync.includes('event.headers.Authorization'), 'Netlify 管理員驗證必須兼容 Authorization header 大小寫');
-assert.ok(orderHelper.includes("responseText !== 'OK'"), 'Google Sheet webhook 必須檢查 Apps Script 回應內容');
+assert.ok(orderHelper.includes('responseText !== expectedResponse'), 'Google Sheet webhook 必須檢查 Apps Script 回應內容');
 assert.ok(orderHelper.includes("apikey: SUPABASE_KEY") && !orderHelper.includes('Bearer ${SUPABASE_KEY}'), 'sb_secret_ 只能作為 apikey');
 assert.ok(ecpayReturn.includes("params.RtnCode === '1'") && ecpayReturn.includes('expected_amount'), '綠界成功及金額驗證後才可建立訂單');
 assert.ok(orderCreate.includes('await validateProductPricing') && ecpayCheckout.includes('await validateProductPricing'), '匯款建單與綠界付款初始化都必須驗證後台商品價格');
@@ -109,3 +110,18 @@ assert.equal((checkout.match(/Object\.assign\(params, data\.params, \{ CheckMacV
 assert.equal((checkout.match(/zipcode: document\.getElementById\('zipcode'\)/g)||[]).length, 2, '兩個結帳入口都必須保留 shipping.zipcode');
 assert.ok(netlifyConfig.includes('no-cache, no-store, must-revalidate'), 'admin/app.js 必須停用快取');
 assert.ok(workflow.includes('tests/*.cjs tests/*.mjs') && workflow.includes('node --check'), 'GitHub Actions 必須執行測試及語法檢查');
+
+assert.ok(app.includes('<th>操作</th>') && app.includes('data-delete-order=') && app.includes('刪除訂單'), '所有後台訂單都必須提供刪除操作');
+assert.ok(app.includes('刪除後不可復原') && app.includes('confirmation!==order.order_no'), '刪除前必須警告且要求完整訂單編號完全一致');
+assert.ok(app.includes('order.logistics_trade_no') && app.includes('不會取消綠界物流單'), '已有物流單時必須顯示不會取消物流單的額外警告');
+assert.ok(app.includes("'/.netlify/functions/order-delete'") && app.includes('Authorization:`Bearer ${state.token}`'), '前端必須以管理員 token 呼叫刪除 endpoint');
+assert.ok(app.includes("state.data=await cloudLoad();renderOrders();toast('訂單已安全刪除')"), '刪除成功後必須重新載入訂單與毛利統計並提示成功');
+assert.ok(orderDelete.includes('await requireAdmin(event)') && orderDelete.includes('confirmation !== orderNo'), '刪除 endpoint 必須驗證管理員及完整訂單編號');
+const sheetDeleteAt = orderDelete.indexOf("await syncSheet({ order_no: orderNo }, 'deleteOrder')");
+const ordersDeleteAt = orderDelete.indexOf('method: \'DELETE\', headers: { Prefer: \'return=representation\' }');
+const pendingDeleteAt = orderDelete.indexOf('pending_ecpay_orders?order_no=eq.');
+assert.ok(sheetDeleteAt >= 0 && sheetDeleteAt < ordersDeleteAt && ordersDeleteAt < pendingDeleteAt, '必須依 Sheet、orders、pending_ecpay_orders 順序刪除');
+assert.ok(orderDelete.includes('不在此取消或修改任何綠界交易或物流單'), '刪除 endpoint 不得取消或修改綠界交易或物流單');
+assert.ok(sheetScript.includes("request.action === 'deleteOrder'") && sheetScript.includes("headers.indexOf('訂單編號')") && sheetScript.includes("createTextOutput('DELETED')"), 'Apps Script 必須依訂單編號欄刪除整列並明確回覆 DELETED');
+assert.ok(orderHelper.includes("action === 'deleteOrder' ? 'DELETED' : 'OK'") && orderHelper.includes("if (action === 'deleteOrder') throw"), '刪除必須要求 DELETED，且未設定 Sheet webhook 時停止');
+assert.ok(html.includes('app.js?v=20260828'), 'admin/app.js 必須更新 cache bust');
