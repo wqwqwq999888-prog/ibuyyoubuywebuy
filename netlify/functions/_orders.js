@@ -54,16 +54,47 @@ async function validateProductPricing(order) {
     return { productNo, name: String(product.name), price: Number(product.price), qty: requested.get(productNo) };
   });
   const productAmount = order.items.reduce((total, item) => total + item.price * item.qty, 0);
-  const discountAmount = Number(order.discount_amount);
+  const discount = await validateDiscount(order.discount_code, productAmount);
+  const discountAmount = discount.discountAmount;
   const shippingFee = Number(order.shipping_fee);
   if (discountAmount < 0 || discountAmount > productAmount || shippingFee < 0) throw new Error('折扣或運費金額錯誤');
   const expectedTotal = productAmount - discountAmount + shippingFee;
-  if (order.product_amount !== productAmount || order.order_amount !== expectedTotal) {
+  if (order.product_amount !== productAmount || Number(order.discount_amount) !== discountAmount || order.order_amount !== expectedTotal) {
     throw new Error('商品價格已更新，請重新整理購物車後再下單');
   }
   order.product_amount = productAmount;
+  order.discount_amount = discountAmount;
+  order.discount_code = discount.code || null;
+  order.partner_name = discount.partnerName || null;
   order.order_amount = expectedTotal;
   return order;
+}
+
+async function validateDiscount(rawCode, subtotal) {
+  const code = String(rawCode || '').trim().toUpperCase();
+  if (!code) return { code: '', discountAmount: 0, partnerName: '' };
+
+  const discounts = await supabase(`discounts?code=eq.${encodeURIComponent(code)}&enabled=eq.true&select=code,discount_type,discount_value,minimum_amount,usage_limit,starts_at,ends_at`);
+  const discount = discounts[0];
+  const now = Date.now();
+  if (!discount || (discount.starts_at && Date.parse(discount.starts_at) > now) || (discount.ends_at && Date.parse(discount.ends_at) < now)) {
+    throw new Error('折扣碼不存在、尚未開始或已過期');
+  }
+  if (subtotal < Number(discount.minimum_amount || 0)) {
+    throw new Error(`商品金額需滿 NT$ ${Number(discount.minimum_amount).toLocaleString('en-US')} 才能使用`);
+  }
+  if (Number(discount.usage_limit || 0) > 0) {
+    const uses = await supabase(`orders?discount_code=eq.${encodeURIComponent(code)}&select=id`);
+    if (uses.length >= Number(discount.usage_limit)) throw new Error('此折扣碼已達使用上限');
+  }
+
+  const value = Number(discount.discount_value);
+  const discountAmount = discount.discount_type === 'percent'
+    ? Math.round(subtotal * (1 - value / 10))
+    : Math.min(subtotal, value);
+  const campaigns = await supabase(`campaigns?discount_code=eq.${encodeURIComponent(code)}&enabled=eq.true&select=partner_name,starts_at,ends_at`);
+  const campaign = campaigns.find(item => (!item.starts_at || Date.parse(item.starts_at) <= now) && (!item.ends_at || Date.parse(item.ends_at) >= now));
+  return { code, discountAmount, partnerName: campaign?.partner_name || '' };
 }
 
 async function addProductCosts(order) {
@@ -105,4 +136,4 @@ async function requireAdmin(event) {
   return user;
 }
 
-module.exports = { supabase, normalizeOrder, validateProductPricing, addProductCosts, syncSheet, requireAdmin };
+module.exports = { supabase, normalizeOrder, validateProductPricing, validateDiscount, addProductCosts, syncSheet, requireAdmin };

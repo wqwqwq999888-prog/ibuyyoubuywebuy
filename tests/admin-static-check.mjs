@@ -76,6 +76,7 @@ const orderCreate = readFileSync(new URL('../netlify/functions/order-create.js',
 const ecpayCheckout = readFileSync(new URL('../netlify/functions/ecpay-checkout.js', import.meta.url), 'utf8');
 const sheetScript = readFileSync(new URL('../google-apps-script/order-fields.gs', import.meta.url), 'utf8');
 const orderDelete = readFileSync(new URL('../netlify/functions/order-delete.js', import.meta.url), 'utf8');
+const discountValidate = readFileSync(new URL('../netlify/functions/discount-validate.js', import.meta.url), 'utf8');
 assert.ok(sheetScript.includes("request.action === 'upsertOrder'") && sheetScript.includes('notifyNewServerOrder_'), '只有正式新建訂單可寄送確認信');
 assert.ok(sheetScript.includes("headers.indexOf('訂單編號')") && sheetScript.includes('sheets[0]'), 'Apps Script 必須能辨識既有訂單工作表');
 assert.ok(sheetScript.includes("SpreadsheetApp.openById(ORDER_SPREADSHEET_ID)") && sheetScript.includes("ORDER_FROM_EMAIL = 'dzhenmai@gmail.com'"), '訂單副本與寄件人必須固定使用正式設定');
@@ -90,6 +91,8 @@ assert.ok(orderHelper.includes('responseText !== expectedResponse'), 'Google She
 assert.ok(orderHelper.includes("apikey: SUPABASE_KEY") && !orderHelper.includes('Bearer ${SUPABASE_KEY}'), 'sb_secret_ 只能作為 apikey');
 assert.ok(ecpayReturn.includes("params.RtnCode === '1'") && ecpayReturn.includes('expected_amount'), '綠界成功及金額驗證後才可建立訂單');
 assert.ok(orderCreate.includes('await validateProductPricing') && ecpayCheckout.includes('await validateProductPricing'), '匯款建單與綠界付款初始化都必須驗證後台商品價格');
+assert.ok(checkout.includes("fetch('/.netlify/functions/discount-validate'") && !checkout.includes('function getAvailableDiscounts'), '結帳頁必須透過伺服器驗證雲端折扣碼');
+assert.ok(discountValidate.includes('validateDiscount') && orderHelper.includes('Number(order.discount_amount) !== discountAmount'), '折扣金額必須在顯示與建單時由伺服器驗證');
 assert.ok(ecpayCheckout.includes('payload: validatedPayload'), '綠界付款完成後必須使用付款初始化時驗證過的商品快照');
 assert.ok(checkout.includes('async function requestEcpaySignature') && checkout.includes('!response.ok || !result.CheckMacValue'), '結帳頁必須攔截後端價格驗證與簽章錯誤');
 

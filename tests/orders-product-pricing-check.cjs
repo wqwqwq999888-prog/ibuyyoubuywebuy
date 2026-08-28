@@ -24,9 +24,9 @@ function payload(overrides = {}) {
       { productNo: '200001', name: '竄改組合', price: 1, qty: 1 }
     ],
     productAmount: 1040,
-    discountAmount: 40,
+    discountAmount: 0,
     shippingFee: 65,
-    total: 1065,
+    total: 1105,
     ...overrides
   };
 }
@@ -38,7 +38,7 @@ function payload(overrides = {}) {
     { productNo: '200001', name: '後台組合名稱', price: 600, qty: 1 }
   ]);
   assert.equal(order.product_amount, 1040);
-  assert.equal(order.order_amount, 1065);
+  assert.equal(order.order_amount, 1105);
 
   await assert.rejects(
     validateProductPricing(normalizeOrder(payload({ productAmount: 2, total: 27 }), '待付款')),
