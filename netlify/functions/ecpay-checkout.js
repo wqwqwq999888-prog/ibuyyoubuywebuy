@@ -62,6 +62,8 @@ exports.handler = async (event) => {
       items: pending.items,
       subtotal: pending.product_amount,
       productAmount: pending.product_amount,
+      discountAmount: pending.discount_amount,
+      shippingFee: pending.shipping_fee,
       total: pending.order_amount
     };
     await supabase('pending_ecpay_orders?on_conflict=order_no', {
