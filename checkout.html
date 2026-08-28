@@ -799,27 +799,23 @@ function getSubtotal() {
     .reduce((a, k) => a + (checkoutProduct(k)?.price || 0) * cart[k], 0);
 }
 
-function getAvailableDiscounts() {
-  try { return JSON.parse(localStorage.getItem('ibuy-admin-data-v1') || '{}').discounts || []; }
-  catch(e) { return []; }
-}
-
-function getCampaignPartner(code) {
-  try { const data=JSON.parse(localStorage.getItem('ibuy-admin-data-v1')||'{}'); return (data.campaigns||[]).find(c=>c.discount_code===code)?.partner_name || ''; }
-  catch(e) { return ''; }
-}
-
-function applyDiscountCode() {
+async function applyDiscountCode() {
   const code = document.getElementById('discountCode').value.trim().toUpperCase();
   const message = document.getElementById('discountMessage');
-  const now = new Date();
-  const discount = getAvailableDiscounts().find(d => d.code === code && d.enabled && (!d.starts_at || new Date(d.starts_at) <= now) && (!d.ends_at || new Date(d.ends_at) >= now));
   const subtotal = getSubtotal();
-  if (!discount) { appliedDiscount=null; discountAmount=0; message.textContent='折扣碼不存在、尚未開始或已過期'; message.style.color='#c0392b'; updateTotal(); return; }
-  if (subtotal < Number(discount.minimum_amount || 0)) { appliedDiscount=null; discountAmount=0; message.textContent=`商品金額需滿 NT$ ${Number(discount.minimum_amount).toLocaleString()} 才能使用`; message.style.color='#c0392b'; updateTotal(); return; }
-  appliedDiscount=discount;
-  discountAmount=discount.discount_type === 'percent' ? Math.round(subtotal * (1 - Number(discount.discount_value)/10)) : Math.min(subtotal, Number(discount.discount_value));
-  message.textContent=`已套用 ${discount.code}`; message.style.color='var(--green)'; updateTotal();
+  message.textContent='正在驗證折扣碼…'; message.style.color='var(--text-dim)';
+  try {
+    const response = await fetch('/.netlify/functions/discount-validate', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ code, subtotal })
+    });
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.error || '折扣碼驗證失敗');
+    appliedDiscount = { code: result.code, partner_name: result.partnerName || '' };
+    discountAmount = Number(result.discountAmount);
+    message.textContent=`已套用 ${result.code}`; message.style.color='var(--green)'; updateTotal();
+  } catch (error) {
+    appliedDiscount=null; discountAmount=0; message.textContent=error.message; message.style.color='#c0392b'; updateTotal();
+  }
 }
 
 function updateTotal(subtotal) {
@@ -1002,7 +998,7 @@ async function submitOrder() {
     productAmount: getSubtotal(),
     discountAmount: discountAmount,
     discountCode: appliedDiscount ? appliedDiscount.code : '',
-    partnerName: getCampaignPartner(appliedDiscount ? appliedDiscount.code : ''),
+    partnerName: appliedDiscount?.partner_name || '',
     shippingFee: shippingFee,
     total: Math.max(0, getSubtotal() - discountAmount) + shippingFee,
   };
@@ -1271,7 +1267,7 @@ function showToast(msg) {
     productAmount: subtotal,
     discountAmount: discountAmount,
     discountCode: appliedDiscount ? appliedDiscount.code : '',
-    partnerName: getCampaignPartner(appliedDiscount ? appliedDiscount.code : ''),
+    partnerName: appliedDiscount?.partner_name || '',
     shippingFee: shippingFee,
     total: total,
     transfer5: '',
