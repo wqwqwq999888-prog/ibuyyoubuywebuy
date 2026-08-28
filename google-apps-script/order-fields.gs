@@ -96,9 +96,17 @@ function handleOrderWebhook(e, request) {
   if (!sheet) return ContentService.createTextOutput('Order sheet not found');
 
   var values = sheet.getDataRange().getValues();
+  var headers = values.length ? values[0].map(String) : [];
+  var orderNumberColumn = headers.indexOf('訂單編號');
+  if (orderNumberColumn < 0) return ContentService.createTextOutput('Order number column not found');
   var rowIndex = values.findIndex(function(row, index) {
-    return index > 0 && String(row[1]) === String(order.order_no);
+    return index > 0 && String(row[orderNumberColumn]) === String(order.order_no);
   });
+  if (request.action === 'deleteOrder') {
+    if (rowIndex > 0) sheet.deleteRow(rowIndex + 1);
+    // 冪等刪除：找到或原本已不存在，都明確回覆 DELETED。
+    return ContentService.createTextOutput('DELETED');
+  }
   var itemsText = (order.items || []).map(function(item) {
     return item.name + ' × ' + item.qty;
   }).join('、');

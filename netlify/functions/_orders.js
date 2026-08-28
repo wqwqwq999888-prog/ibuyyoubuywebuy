@@ -76,7 +76,10 @@ async function addProductCosts(order) {
 }
 
 async function syncSheet(order, action = 'upsertOrder') {
-  if (!process.env.GOOGLE_SHEET_WEBHOOK_URL) return;
+  if (!process.env.GOOGLE_SHEET_WEBHOOK_URL) {
+    if (action === 'deleteOrder') throw new Error('尚未設定 Google Sheet webhook，無法安全刪除訂單');
+    return;
+  }
   const url = new URL(process.env.GOOGLE_SHEET_WEBHOOK_URL);
   if (process.env.GOOGLE_SHEET_WEBHOOK_SECRET) url.searchParams.set('secret', process.env.GOOGLE_SHEET_WEBHOOK_SECRET);
   const response = await fetch(url, {
@@ -84,7 +87,22 @@ async function syncSheet(order, action = 'upsertOrder') {
     body: JSON.stringify({ action, order })
   });
   const responseText = (await response.text()).trim();
-  if (!response.ok || responseText !== 'OK') throw new Error(`Google Sheet sync ${response.status}: ${responseText}`);
+  const expectedResponse = action === 'deleteOrder' ? 'DELETED' : 'OK';
+  if (!response.ok || responseText !== expectedResponse) throw new Error(`Google Sheet sync ${response.status}: ${responseText}`);
 }
 
-module.exports = { supabase, normalizeOrder, validateProductPricing, addProductCosts, syncSheet };
+async function requireAdmin(event) {
+  const authorization = event.headers.authorization || event.headers.Authorization || '';
+  const jwt = authorization.replace(/^Bearer\s+/i, '');
+  if (!jwt || jwt.startsWith('sb_secret_')) {
+    const error = new Error('登入已過期，請重新登入'); error.statusCode = 401; throw error;
+  }
+  const auth = await fetch(`${SUPABASE_URL}/auth/v1/user`, { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${jwt}` } });
+  if (!auth.ok) { const error = new Error('登入已過期，請重新登入'); error.statusCode = 401; throw error; }
+  const user = await auth.json();
+  const admins = await supabase(`admin_users?user_id=eq.${encodeURIComponent(user.id)}&select=user_id`);
+  if (!admins.length) { const error = new Error('此帳號沒有管理員權限'); error.statusCode = 403; throw error; }
+  return user;
+}
+
+module.exports = { supabase, normalizeOrder, validateProductPricing, addProductCosts, syncSheet, requireAdmin };
