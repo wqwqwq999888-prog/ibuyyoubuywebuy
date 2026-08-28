@@ -956,7 +956,7 @@ async function requestEcpaySignature(params, order) {
   if (!response.ok || !result.CheckMacValue) {
     throw new Error(result.error || '付款初始化失敗，請稍後再試');
   }
-  return result.CheckMacValue;
+  return result;
 }
 
 async function submitOrder() {
@@ -985,6 +985,7 @@ async function submitOrder() {
       storefamilyId: document.getElementById('storefamilyId')?.value || '',
       storefamilyAddress: document.getElementById('storefamilyAddress')?.value || '',
       city: document.getElementById('city')?.value || '',
+      zipcode: document.getElementById('zipcode')?.value || '',
       address: document.getElementById('address')?.value || '',
     },
     payment: selectedPayment,
@@ -1055,7 +1056,8 @@ async function submitOrder() {
 
   // 呼叫後端取得 CheckMacValue
   try {
-    params.CheckMacValue = await requestEcpaySignature(params, { ...orderData, orderId: params.MerchantTradeNo });
+    const data = await requestEcpaySignature(params, { ...orderData, orderId: params.MerchantTradeNo });
+    Object.assign(params, data.params, { CheckMacValue: data.CheckMacValue });
   } catch(e) {
     document.getElementById('orderLoading').hidden = true;
     btn.disabled = false;
@@ -1254,6 +1256,7 @@ function showToast(msg) {
       storefamilyId: document.getElementById('storefamilyId')?.value || '',
       storefamilyAddress: document.getElementById('storefamilyAddress')?.value || '',
       city: document.getElementById('city')?.value || '',
+      zipcode: document.getElementById('zipcode')?.value || '',
       address: document.getElementById('address')?.value || '',
     },
     payment: 'credit',
@@ -1290,7 +1293,8 @@ function showToast(msg) {
   };
 
   try {
-    params.CheckMacValue = await requestEcpaySignature(params, orderData);
+    const data = await requestEcpaySignature(params, orderData);
+    Object.assign(params, data.params, { CheckMacValue: data.CheckMacValue });
   } catch(e) {
     showToast(e.message || '付款初始化失敗，請稍後再試');
     return;

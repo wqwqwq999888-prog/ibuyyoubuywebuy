@@ -1,0 +1,8 @@
+alter table public.orders
+  add column if not exists logistics_trade_no text,
+  add column if not exists logistics_status text,
+  add column if not exists logistics_message text,
+  add column if not exists logistics_created_at timestamptz;
+
+create unique index if not exists orders_logistics_trade_no_idx
+  on public.orders(logistics_trade_no) where logistics_trade_no is not null;

@@ -35,7 +35,18 @@ exports.handler = async (event) => {
   const HASH_IV = process.env.ECPAY_HASH_IV;
 
   const request = JSON.parse(event.body || '{}');
-  const params = request.params || request;
+  const requestedParams = request.params || request;
+  // Keep the payment payload assembled on the server.  Besides preventing the
+  // browser from accidentally dropping signed fields, this also guarantees
+  // that the payer and order references reach ECPay in both checkout flows.
+  const params = {
+    ...requestedParams,
+    MerchantID: process.env.ECPAY_MERCHANT_ID || requestedParams.MerchantID || '3504484',
+    CustomField1: String(request.order?.customer?.name || requestedParams.CustomField1 || ''),
+    CustomField2: String(request.order?.customer?.phone || requestedParams.CustomField2 || ''),
+    CustomField3: String(request.order?.customer?.email || requestedParams.CustomField3 || ''),
+    CustomField4: String(request.order?.orderId || requestedParams.MerchantTradeNo || '')
+  };
   if (request.order) {
     let pending;
     try {
@@ -78,6 +89,6 @@ exports.handler = async (event) => {
       'Content-Type': 'application/json',
       'Access-Control-Allow-Origin': '*',
     },
-    body: JSON.stringify({ CheckMacValue: checkMacValue }),
+    body: JSON.stringify({ params, CheckMacValue: checkMacValue }),
   };
 };

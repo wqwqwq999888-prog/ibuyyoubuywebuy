@@ -36,8 +36,15 @@ exports.handler = async (event) => {
   if (params.RtnCode === '1') {
     const orderId = params.MerchantTradeNo;
     try {
+      const existing = await supabase(`orders?order_no=eq.${encodeURIComponent(orderId)}&select=order_no`);
+      // ECPay retries callbacks and its simulator can send the same callback
+      // repeatedly.  An already-created order has nothing left to do.
+      if (existing.length) return { statusCode: 200, headers: { 'Content-Type': 'text/plain' }, body: '1|OK' };
       const pending = await supabase(`pending_ecpay_orders?order_no=eq.${encodeURIComponent(orderId)}&select=*`);
-      if (!pending.length || Number(params.TradeAmt) !== pending[0].expected_amount) return { statusCode: 200, body: '0|AmountError' };
+      // A deliberately cancelled test order may already have been deleted
+      // locally. ACK it rather than resurrecting it from callback data.
+      if (!pending.length) return { statusCode: 200, headers: { 'Content-Type': 'text/plain' }, body: '1|OK' };
+      if (Number(params.TradeAmt) !== pending[0].expected_amount) return { statusCode: 200, body: '0|AmountError' };
       const order = await addProductCosts(normalizeOrder({ ...pending[0].payload, tradeNo: params.TradeNo }, '已付款'));
       const created = await supabase('orders?on_conflict=order_no', { method: 'POST', headers: { Prefer: 'resolution=ignore-duplicates,return=representation' }, body: JSON.stringify(order) });
       if (created.length) await syncSheet(created[0]);

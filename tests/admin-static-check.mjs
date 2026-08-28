@@ -16,7 +16,7 @@ for (const label of ['商品管理', '物流管理', '折扣管理', '團購管�
   assert.ok(html.includes(label), `後台缺少「${label}」`);
 }
 
-assert.ok(html.includes('<script src="app.js"></script>'), 'app.js 必須能在直接開啟檔案時執行');
+assert.match(html, /<script src="app\.js\?v=\d+"><\/script>/, 'app.js 必須能在直接開啟檔案時執行並使用 cache bust');
 assert.ok(!html.includes('type="module"'), '本地預覽不應依賴 module HTTP 載入');
 assert.ok(launcher.includes('url=admin/index.html'), '根目錄啟動頁必須導向後台');
 assert.ok(app.includes("free_threshold: 1500"), '超商免運門檻預設值應為 1500');
@@ -91,3 +91,21 @@ assert.ok(ecpayReturn.includes("params.RtnCode === '1'") && ecpayReturn.includes
 assert.ok(orderCreate.includes('await validateProductPricing') && ecpayCheckout.includes('await validateProductPricing'), '匯款建單與綠界付款初始化都必須驗證後台商品價格');
 assert.ok(ecpayCheckout.includes('payload: validatedPayload'), '綠界付款完成後必須使用付款初始化時驗證過的商品快照');
 assert.ok(checkout.includes('async function requestEcpaySignature') && checkout.includes('!response.ok || !result.CheckMacValue'), '結帳頁必須攔截後端價格驗證與簽章錯誤');
+
+const logisticsCreate = readFileSync(new URL('../netlify/functions/ecpay-logistics-create.js', import.meta.url), 'utf8');
+const logisticsCallback = readFileSync(new URL('../netlify/functions/ecpay-logistics-callback.js', import.meta.url), 'utf8');
+const logisticsMigration = readFileSync(new URL('../supabase/migrations/20260827000000_ecpay_logistics.sql', import.meta.url), 'utf8');
+const netlifyConfig = readFileSync(new URL('../netlify.toml', import.meta.url), 'utf8');
+const workflow = readFileSync(new URL('../.github/workflows/tests.yml', import.meta.url), 'utf8');
+assert.ok(logisticsCreate.includes("'UNIMARTC2C'") && logisticsCreate.includes("'FAMIC2C'") && logisticsCreate.includes("'TCAT'"), '物流建單必須支援 7-ELEVEN、全家與黑貓');
+assert.ok(logisticsCreate.includes("['已付款', '已匯款待確認']"), '信用卡已付款及匯款待確認訂單皆可建立物流單');
+assert.ok(app.includes('建立綠界物流單') && app.includes('data-create-logistics'), '後台配送資料欄必須提供物流建單操作');
+assert.ok(logisticsCallback.includes("checkMacValue(params, 'md5')") && logisticsCallback.includes("body: '1|OK'"), '物流 callback 必須驗證 CheckMacValue 並 ACK');
+for (const column of ['logistics_trade_no','logistics_status','logistics_message','logistics_created_at']) assert.ok(logisticsMigration.includes(column), `物流 migration 缺少 ${column}`);
+assert.ok(ecpayReturn.includes('if (!pending.length)') && ecpayReturn.includes("body: '1|OK'"), '已刪除測試交易與重複付款 callback 必須只 ACK');
+assert.ok(ecpayCheckout.includes('CustomField1') && ecpayCheckout.includes('CustomField2') && ecpayCheckout.includes('CustomField3') && ecpayCheckout.includes('CustomField4'), '付款參數必須包含付款人與訂單資訊');
+assert.ok(ecpayCheckout.includes('JSON.stringify({ params, CheckMacValue: checkMacValue })'), 'Server 必須回傳完整簽章參數');
+assert.equal((checkout.match(/Object\.assign\(params, data\.params, \{ CheckMacValue: data\.CheckMacValue \}\)/g)||[]).length, 2, '兩個信用卡入口都必須採用 Server 完整參數');
+assert.equal((checkout.match(/zipcode: document\.getElementById\('zipcode'\)/g)||[]).length, 2, '兩個結帳入口都必須保留 shipping.zipcode');
+assert.ok(netlifyConfig.includes('no-cache, no-store, must-revalidate'), 'admin/app.js 必須停用快取');
+assert.ok(workflow.includes('tests/*.cjs tests/*.mjs') && workflow.includes('node --check'), 'GitHub Actions 必須執行測試及語法檢查');
