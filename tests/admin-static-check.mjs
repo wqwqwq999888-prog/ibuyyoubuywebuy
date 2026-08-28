@@ -93,6 +93,7 @@ assert.ok(ecpayReturn.includes("params.RtnCode === '1'") && ecpayReturn.includes
 assert.ok(orderCreate.includes('await validateProductPricing') && ecpayCheckout.includes('await validateProductPricing'), '匯款建單與綠界付款初始化都必須驗證後台商品價格');
 assert.ok(orderHelper.includes('shipping_methods?id=eq.') && orderHelper.includes('method.enabled !== true'), '後端必須重新讀取物流設定並拒絕停用方式');
 assert.ok(!checkout.includes('shippingFee = 65') && !checkout.includes('discountedSubtotal >= 1500'), '結帳頁不得寫死運費或免運門檻');
+assert.ok(checkout.includes("price.textContent = '物流關閉中'") && checkout.includes('input.disabled = !method'), '停用物流方式必須明確顯示關閉且禁止選取');
 assert.ok(checkout.includes("fetch('/.netlify/functions/discount-validate'") && !checkout.includes('function getAvailableDiscounts'), '結帳頁必須透過伺服器驗證雲端折扣碼');
 assert.ok(discountValidate.includes('validateDiscount') && orderHelper.includes('Number(order.discount_amount) !== discountAmount'), '折扣金額必須在顯示與建單時由伺服器驗證');
 assert.ok(ecpayCheckout.includes('payload: validatedPayload'), '綠界付款完成後必須使用付款初始化時驗證過的商品快照');

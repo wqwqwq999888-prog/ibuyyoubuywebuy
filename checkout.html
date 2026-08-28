@@ -134,6 +134,8 @@ nav {
 }
 .shipping-option:hover { border-color: var(--gold-dim); }
 .shipping-option.selected { border-color: var(--gold); background: rgba(201,168,76,0.06); }
+.shipping-option.disabled { opacity: .58; cursor: not-allowed; }
+.shipping-option.disabled:hover { border-color: var(--dark3); }
 .shipping-option input[type=radio] { display: none; }
 .radio-dot {
   width: 18px; height: 18px; border-radius: 50%;
@@ -853,14 +855,26 @@ async function loadShippingMethods() {
   document.querySelectorAll('.shipping-option').forEach(option => {
     const input = option.querySelector('input[name="shipping"]');
     const method = shippingMethods[input.value];
-    option.hidden = !method;
-    if (!method) return;
     const price = option.querySelector('.shipping-price');
     const description = option.querySelector('.shipping-desc');
+    input.disabled = !method;
+    option.classList.toggle('disabled', !method);
+    option.setAttribute('aria-disabled', String(!method));
+    if (!method) {
+      input.checked = false;
+      option.classList.remove('selected');
+      price.textContent = '物流關閉中';
+      description.textContent = '目前暫停提供此配送方式';
+      return;
+    }
     price.textContent = `NT$ ${Number(method.fee)}`;
     description.textContent = description.textContent.replace(/免運門檻載入中|滿NT\$[\d,]+免運/, `滿NT$${Number(method.free_threshold).toLocaleString('en-US')}免運`);
   });
-  if (selectedShipping && !shippingMethods[selectedShipping]) selectedShipping = '';
+  if (selectedShipping && !shippingMethods[selectedShipping]) {
+    selectedShipping = '';
+    document.querySelectorAll('.delivery-fields').forEach(field => field.classList.remove('show'));
+    updateTotal();
+  }
 }
 
 // 選配送方式
