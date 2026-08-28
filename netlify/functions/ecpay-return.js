@@ -1,5 +1,5 @@
 const crypto = require('crypto');
-const { supabase, normalizeOrder, addProductCosts, syncSheet } = require('./_orders');
+const { supabase, normalizeOrder, validateProductPricing, addProductCosts, syncSheet } = require('./_orders');
 
 exports.handler = async (event) => {
   if (event.httpMethod !== 'POST') {
@@ -44,8 +44,11 @@ exports.handler = async (event) => {
       // A deliberately cancelled test order may already have been deleted
       // locally. ACK it rather than resurrecting it from callback data.
       if (!pending.length) return { statusCode: 200, headers: { 'Content-Type': 'text/plain' }, body: '1|OK' };
-      if (Number(params.TradeAmt) !== pending[0].expected_amount) return { statusCode: 200, body: '0|AmountError' };
-      const order = await addProductCosts(normalizeOrder({ ...pending[0].payload, tradeNo: params.TradeNo }, '已付款'));
+      const repriced = await validateProductPricing(normalizeOrder({ ...pending[0].payload, tradeNo: params.TradeNo }, '已付款'));
+      if (Number(params.TradeAmt) !== pending[0].expected_amount || Number(params.TradeAmt) !== repriced.order_amount) {
+        return { statusCode: 200, body: '0|AmountError' };
+      }
+      const order = await addProductCosts(repriced);
       const created = await supabase('orders?on_conflict=order_no', { method: 'POST', headers: { Prefer: 'resolution=ignore-duplicates,return=representation' }, body: JSON.stringify(order) });
       if (created.length) await syncSheet(created[0]);
       await supabase(`pending_ecpay_orders?order_no=eq.${encodeURIComponent(orderId)}`, { method: 'DELETE' });

@@ -134,6 +134,8 @@ nav {
 }
 .shipping-option:hover { border-color: var(--gold-dim); }
 .shipping-option.selected { border-color: var(--gold); background: rgba(201,168,76,0.06); }
+.shipping-option.disabled { opacity: .58; cursor: not-allowed; }
+.shipping-option.disabled:hover { border-color: var(--dark3); }
 .shipping-option input[type=radio] { display: none; }
 .radio-dot {
   width: 18px; height: 18px; border-radius: 50%;
@@ -349,9 +351,9 @@ nav {
           <div class="radio-dot"></div>
           <div class="shipping-info">
             <div class="shipping-name">🏪 7-ELEVEN 超商取貨</div>
-            <div class="shipping-desc">3-5個工作天 · 至指定門市取貨 · 滿NT$1,500免運</div>
+            <div class="shipping-desc">3-5個工作天 · 至指定門市取貨 · 免運門檻載入中</div>
           </div>
-          <div class="shipping-price" id="price711">NT$ 65</div>
+          <div class="shipping-price" id="price711">載入中…</div>
         </label>
 
         <label class="shipping-option" onclick="selectShipping('family', this)">
@@ -359,9 +361,9 @@ nav {
           <div class="radio-dot"></div>
           <div class="shipping-info">
             <div class="shipping-name">🏪 全家 FamilyMart 超商取貨</div>
-            <div class="shipping-desc">3-5個工作天 · 至指定門市取貨 · 滿NT$1,500免運</div>
+            <div class="shipping-desc">3-5個工作天 · 至指定門市取貨 · 免運門檻載入中</div>
           </div>
-          <div class="shipping-price" id="pricefamily">NT$ 65</div>
+          <div class="shipping-price" id="pricefamily">載入中…</div>
         </label>
 
         <label class="shipping-option" onclick="selectShipping('kuroneko', this)">
@@ -369,9 +371,9 @@ nav {
           <div class="radio-dot"></div>
           <div class="shipping-info">
             <div class="shipping-name">🐱 黑貓宅急便</div>
-            <div class="shipping-desc">1-3個工作天 · 到府配送 · 滿NT$2,000免運</div>
+            <div class="shipping-desc">1-3個工作天 · 到府配送 · 免運門檻載入中</div>
           </div>
-          <div class="shipping-price" id="pricekuroneko">NT$ 130</div>
+          <div class="shipping-price" id="pricekuroneko">載入中…</div>
         </label>
       </div>
 
@@ -652,6 +654,7 @@ let cart = {};
 let selectedShipping = '';
 let selectedPayment = 'bank';
 let shippingFee = 0;
+let shippingMethods = {};
 let appliedDiscount = null;
 let discountAmount = 0;
 
@@ -779,18 +782,6 @@ function renderOrderSummary() {
   document.getElementById('orderItems').innerHTML = html;
   document.getElementById('subtotalAmt').textContent = `NT$ ${subtotal}`;
 
-// 免運提示
-  const discountedSubtotal = Math.max(0, subtotal - discountAmount);
-  const freeLeft1500 = 1500 - discountedSubtotal;
-  const freeLeft3000 = 3000 - discountedSubtotal;
-  if (selectedShipping === '711' || selectedShipping === 'family') {
-    document.getElementById('freeShippingMsg').textContent = discountedSubtotal >= 1500 ? '' : `折扣後再買 NT$ ${freeLeft1500} 享超商免運`;
-  } else if (selectedShipping === 'kuroneko') {
-    document.getElementById('freeShippingMsg').textContent = discountedSubtotal >= 3000 ? '' : `折扣後再買 NT$ ${freeLeft3000} 享宅配免運`;
-  } else {
-    document.getElementById('freeShippingMsg').textContent = '';
-  }
-
   updateTotal(subtotal);
 }
 
@@ -824,33 +815,71 @@ function updateTotal(subtotal) {
   document.getElementById('discountRow').style.display = discountAmount > 0 ? 'flex' : 'none';
   document.getElementById('discountAmt').textContent = `- NT$ ${discountAmount}`;
   if (!selectedShipping) {
+    shippingFee = 0;
+    document.getElementById('freeShippingMsg').textContent = '';
     document.getElementById('shippingAmt').textContent = '請選擇配送方式';
     document.getElementById('grandTotal').textContent = `NT$ ${discountedSubtotal}`;
     return;
   }
-  const isCvs = selectedShipping === '711' || selectedShipping === 'family';
-  const isKuroneko = selectedShipping === 'kuroneko';
-  const isFree = isCvs ? discountedSubtotal >= 1500 : isKuroneko ? discountedSubtotal >= 3000 : false;
-
-  if (isFree) shippingFee = 0;
-  else if (isCvs) shippingFee = 65;
-  else if (isKuroneko) shippingFee = 130;
-  else shippingFee = 0;
+  const method = shippingMethods[selectedShipping];
+  if (!method) {
+    selectedShipping = '';
+    shippingFee = 0;
+    document.getElementById('freeShippingMsg').textContent = '';
+    document.getElementById('shippingAmt').textContent = '請選擇配送方式';
+    document.getElementById('grandTotal').textContent = `NT$ ${discountedSubtotal}`;
+    return;
+  }
+  const isFree = discountedSubtotal >= Number(method.free_threshold);
+  shippingFee = isFree ? 0 : Number(method.fee);
+  const freeLeft = Number(method.free_threshold) - discountedSubtotal;
+  document.getElementById('freeShippingMsg').textContent = freeLeft > 0
+    ? `折扣後再買 NT$ ${freeLeft} 享${method.name}免運`
+    : '';
 
   document.getElementById('shippingAmt').textContent = shippingFee === 0 ? '免運 🎉' : `NT$ ${shippingFee}`;
   document.getElementById('grandTotal').textContent = `NT$ ${discountedSubtotal + shippingFee}`;
 
   // 更新顯示的運費
-  ['711','family'].forEach(t => {
-    const el = document.getElementById('price' + t);
-    if (el) el.textContent = (isCvs && isFree) ? '免運 🎉' : 'NT$ 65';
+  Object.values(shippingMethods).forEach(item => {
+    const el = document.getElementById('price' + item.id);
+    if (el) el.textContent = item.id === selectedShipping && isFree ? '免運 🎉' : `NT$ ${Number(item.fee)}`;
   });
-  const kuronekoEl = document.getElementById('pricekuroneko');
-  if (kuronekoEl) kuronekoEl.textContent = (isKuroneko && isFree) ? '免運 🎉' : 'NT$ 130';
+}
+
+async function loadShippingMethods() {
+  const response = await fetch('/.netlify/functions/shipping-methods', { cache: 'no-store' });
+  const methods = await response.json();
+  if (!response.ok || !Array.isArray(methods)) throw new Error(methods.error || '無法取得物流設定');
+  shippingMethods = Object.fromEntries(methods.map(method => [String(method.id), method]));
+  document.querySelectorAll('.shipping-option').forEach(option => {
+    const input = option.querySelector('input[name="shipping"]');
+    const method = shippingMethods[input.value];
+    const price = option.querySelector('.shipping-price');
+    const description = option.querySelector('.shipping-desc');
+    input.disabled = !method;
+    option.classList.toggle('disabled', !method);
+    option.setAttribute('aria-disabled', String(!method));
+    if (!method) {
+      input.checked = false;
+      option.classList.remove('selected');
+      price.textContent = '物流關閉中';
+      description.textContent = '目前暫停提供此配送方式';
+      return;
+    }
+    price.textContent = `NT$ ${Number(method.fee)}`;
+    description.textContent = description.textContent.replace(/免運門檻載入中|滿NT\$[\d,]+免運/, `滿NT$${Number(method.free_threshold).toLocaleString('en-US')}免運`);
+  });
+  if (selectedShipping && !shippingMethods[selectedShipping]) {
+    selectedShipping = '';
+    document.querySelectorAll('.delivery-fields').forEach(field => field.classList.remove('show'));
+    updateTotal();
+  }
 }
 
 // 選配送方式
 function selectShipping(type, el) {
+  if (!shippingMethods[type]) return showToast('此物流方式目前未啟用');
   selectedShipping = type;
   document.querySelectorAll('.shipping-option').forEach(o => o.classList.remove('selected'));
   el.classList.add('selected');
@@ -1376,8 +1405,14 @@ if (selectedShipping === 'kuroneko') {
 }
 // INIT：先使用與首頁相同的雲端商品順序，再解析以索引保存的購物車。
 (async function initCheckoutCatalog() {
-  applyCheckoutCatalog(await loadStorefrontCatalog(true));
-  loadCart();
+  try {
+    const [catalog] = await Promise.all([loadStorefrontCatalog(true), loadShippingMethods()]);
+    applyCheckoutCatalog(catalog);
+    loadCart();
+  } catch (error) {
+    document.getElementById('checkoutForm').style.display = 'none';
+    showToast(error.message || '結帳資料載入失敗，請稍後再試');
+  }
 })();
 </script>
 </body>

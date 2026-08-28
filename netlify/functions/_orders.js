@@ -35,6 +35,24 @@ function normalizeOrder(data, paymentStatus) {
   };
 }
 
+async function applyShippingPricing(order) {
+  const methodId = String(order.shipping_method || '');
+  if (!methodId) throw new Error('請選擇物流方式');
+  const methods = await supabase(`shipping_methods?id=eq.${encodeURIComponent(methodId)}&select=id,name,fee,free_threshold,enabled`);
+  const method = methods[0];
+  if (!method || method.enabled !== true) throw new Error('此物流方式目前未啟用，請重新選擇');
+
+  const fee = Number(method.fee);
+  const freeThreshold = Number(method.free_threshold);
+  if (![fee, freeThreshold].every(Number.isFinite) || fee < 0 || freeThreshold < 0) {
+    throw new Error('物流設定錯誤，請聯絡客服');
+  }
+  const discountedSubtotal = Math.max(0, Number(order.product_amount) - Number(order.discount_amount));
+  order.shipping_fee = discountedSubtotal >= freeThreshold ? 0 : fee;
+  order.order_amount = discountedSubtotal + order.shipping_fee;
+  return order;
+}
+
 async function validateProductPricing(order) {
   const requested = new Map();
   for (const item of order.items) {
@@ -56,18 +74,15 @@ async function validateProductPricing(order) {
   const productAmount = order.items.reduce((total, item) => total + item.price * item.qty, 0);
   const discount = await validateDiscount(order.discount_code, productAmount);
   const discountAmount = discount.discountAmount;
-  const shippingFee = Number(order.shipping_fee);
-  if (discountAmount < 0 || discountAmount > productAmount || shippingFee < 0) throw new Error('折扣或運費金額錯誤');
-  const expectedTotal = productAmount - discountAmount + shippingFee;
-  if (order.product_amount !== productAmount || Number(order.discount_amount) !== discountAmount || order.order_amount !== expectedTotal) {
+  if (discountAmount < 0 || discountAmount > productAmount) throw new Error('折扣金額錯誤');
+  if (order.product_amount !== productAmount || Number(order.discount_amount) !== discountAmount) {
     throw new Error('商品價格已更新，請重新整理購物車後再下單');
   }
   order.product_amount = productAmount;
   order.discount_amount = discountAmount;
   order.discount_code = discount.code || null;
   order.partner_name = discount.partnerName || null;
-  order.order_amount = expectedTotal;
-  return order;
+  return applyShippingPricing(order);
 }
 
 async function validateDiscount(rawCode, subtotal) {
@@ -136,4 +151,4 @@ async function requireAdmin(event) {
   return user;
 }
 
-module.exports = { supabase, normalizeOrder, validateProductPricing, validateDiscount, addProductCosts, syncSheet, requireAdmin };
+module.exports = { supabase, normalizeOrder, applyShippingPricing, validateProductPricing, validateDiscount, addProductCosts, syncSheet, requireAdmin };

@@ -318,6 +318,7 @@ async function submitEditor(event) {
 async function saveShipping(event) {
   event.preventDefault(); setSaving(true);
   try {
+    if (isLocal) throw new Error('物流設定只能在正式雲端後台儲存，本機預覽不會寫入正式網站');
     for (const card of $$('.shipping-card')) {
       const existing = state.data.shipping_methods.find(item => item.id === card.dataset.shippingId);
       const record = { ...existing, enabled:card.querySelector('[name=enabled]').checked,fee:Number(card.querySelector('[name=fee]').value),free_threshold:Number(card.querySelector('[name=free_threshold]').value) };

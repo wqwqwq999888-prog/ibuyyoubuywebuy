@@ -27,14 +27,17 @@ assert.ok(report.includes('id="year"') && report.includes('id="month"'), '團購
 assert.ok(reportScript.includes('/rest/v1/rpc/partner_monthly_report'), '雲端團購主報表必須呼叫安全的報表函式');
 assert.ok(config.includes("mode: 'supabase'"), '後台應使用 Supabase 雲端模式');
 assert.ok(checkout.includes('id="discountCode"'), '結帳頁必須提供折扣碼欄位');
-assert.ok(checkout.includes('discountedSubtotal >= 3000'), '宅配應以折扣後 3000 元判斷免運');
+assert.ok(checkout.includes("fetch('/.netlify/functions/shipping-methods'") && checkout.includes('method.free_threshold'), '結帳頁必須從後端取得運費與免運門檻');
 assert.ok(app.includes("input('product_type','商品分類'") && app.includes('combo_contents'), '後台商品必須能明確指定單包或組合分類');
 assert.ok(catalogMigration.includes("product_type in ('single', 'combo')"), '資料庫必須限制商品分類值');
 assert.ok(app.includes('一般折扣碼可以單獨使用'), '折扣碼介面必須說明不一定綁定團購主');
 assert.ok(checkout.includes('id="orderLoading"') && checkout.includes("getElementById('finalSubmitBtn')"), '送出訂單等待期間必須顯示明確的載入畫面');
 assert.ok(storefront.includes('/rest/v1/products?select=') && storefront.includes('&enabled=eq.true'), '前台必須讀取後台已上架商品');
-assert.ok(home.includes('applyStorefrontCatalog(await loadStorefrontCatalog())'), '首頁必須在繪製商品前同步雲端目錄');
-assert.ok(checkout.includes('applyCheckoutCatalog(await loadStorefrontCatalog(true))'), '結帳頁必須使用首頁同一份商品目錄快照');
+assert.ok(home.includes('Promise.all([loadStorefrontCatalog(), loadStorefrontShippingMethods()])') && home.includes('applyStorefrontCatalog(catalog)'), '首頁必須在繪製商品前同步雲端目錄與物流設定');
+assert.ok(home.includes("fetch('/.netlify/functions/shipping-methods'") && home.includes('method.free_threshold'), '首頁購物車必須從後端取得啟用物流的免運門檻');
+assert.ok(home.includes('超商滿 NT$') && home.includes('宅配滿 NT$') && home.includes('結帳時依配送方式計算'), '未選物流時必須提示各類免運門檻，不得直接宣告免運');
+assert.ok(!home.includes('subtotal >= 1500') && !home.includes('再買 NT$ ${freeLeft}') && !home.includes('🎉 已達免運門檻！'), '首頁購物車不得使用寫死門檻或在未選物流時宣告免運');
+assert.ok(checkout.includes('loadStorefrontCatalog(true)') && checkout.includes('applyCheckoutCatalog(catalog)'), '結帳頁必須使用首頁同一份商品目錄快照');
 assert.ok(home.includes('function cartProduct(key)') && home.includes('const cartKey = c.product_no'), '首頁購物車必須以固定商品編號保存');
 assert.ok(checkout.includes('function checkoutProduct(key)') && checkout.includes("sessionStorage.setItem('cart', JSON.stringify(cart))"), '結帳頁必須依商品編號解析並遷移舊購物車');
 assert.ok(checkout.includes('function checkoutItemSpecification(product, qty)') && checkout.includes("`${specification} × ${qty} 組`"), '結帳頁必須以組為數量單位顯示組合商品規格');
@@ -91,6 +94,9 @@ assert.ok(orderHelper.includes('responseText !== expectedResponse'), 'Google She
 assert.ok(orderHelper.includes("apikey: SUPABASE_KEY") && !orderHelper.includes('Bearer ${SUPABASE_KEY}'), 'sb_secret_ 只能作為 apikey');
 assert.ok(ecpayReturn.includes("params.RtnCode === '1'") && ecpayReturn.includes('expected_amount'), '綠界成功及金額驗證後才可建立訂單');
 assert.ok(orderCreate.includes('await validateProductPricing') && ecpayCheckout.includes('await validateProductPricing'), '匯款建單與綠界付款初始化都必須驗證後台商品價格');
+assert.ok(orderHelper.includes('shipping_methods?id=eq.') && orderHelper.includes('method.enabled !== true'), '後端必須重新讀取物流設定並拒絕停用方式');
+assert.ok(!checkout.includes('shippingFee = 65') && !checkout.includes('discountedSubtotal >= 1500'), '結帳頁不得寫死運費或免運門檻');
+assert.ok(checkout.includes("price.textContent = '物流關閉中'") && checkout.includes('input.disabled = !method'), '停用物流方式必須明確顯示關閉且禁止選取');
 assert.ok(checkout.includes("fetch('/.netlify/functions/discount-validate'") && !checkout.includes('function getAvailableDiscounts'), '結帳頁必須透過伺服器驗證雲端折扣碼');
 assert.ok(discountValidate.includes('validateDiscount') && orderHelper.includes('Number(order.discount_amount) !== discountAmount'), '折扣金額必須在顯示與建單時由伺服器驗證');
 assert.ok(ecpayCheckout.includes('payload: validatedPayload'), '綠界付款完成後必須使用付款初始化時驗證過的商品快照');
@@ -127,4 +133,4 @@ assert.ok(sheetDeleteAt >= 0 && sheetDeleteAt < ordersDeleteAt && ordersDeleteAt
 assert.ok(orderDelete.includes('不在此取消或修改任何綠界交易或物流單'), '刪除 endpoint 不得取消或修改綠界交易或物流單');
 assert.ok(sheetScript.includes("request.action === 'deleteOrder'") && sheetScript.includes("headers.indexOf('訂單編號')") && sheetScript.includes("createTextOutput('DELETED')"), 'Apps Script 必須依訂單編號欄刪除整列並明確回覆 DELETED');
 assert.ok(orderHelper.includes("action === 'deleteOrder' ? 'DELETED' : 'OK'") && orderHelper.includes("if (action === 'deleteOrder') throw"), '刪除必須要求 DELETED，且未設定 Sheet webhook 時停止');
-assert.ok(html.includes('app.js?v=20260828'), 'admin/app.js 必須更新 cache bust');
+assert.ok(html.includes('app.js?v=20260829'), 'admin/app.js 必須更新 cache bust');
