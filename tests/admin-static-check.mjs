@@ -33,7 +33,10 @@ assert.ok(catalogMigration.includes("product_type in ('single', 'combo')"), '資
 assert.ok(app.includes('一般折扣碼可以單獨使用'), '折扣碼介面必須說明不一定綁定團購主');
 assert.ok(checkout.includes('id="orderLoading"') && checkout.includes("getElementById('finalSubmitBtn')"), '送出訂單等待期間必須顯示明確的載入畫面');
 assert.ok(storefront.includes('/rest/v1/products?select=') && storefront.includes('&enabled=eq.true'), '前台必須讀取後台已上架商品');
-assert.ok(home.includes('applyStorefrontCatalog(await loadStorefrontCatalog())'), '首頁必須在繪製商品前同步雲端目錄');
+assert.ok(home.includes('Promise.all([loadStorefrontCatalog(), loadStorefrontShippingMethods()])') && home.includes('applyStorefrontCatalog(catalog)'), '首頁必須在繪製商品前同步雲端目錄與物流設定');
+assert.ok(home.includes("fetch('/.netlify/functions/shipping-methods'") && home.includes('method.free_threshold'), '首頁購物車必須從後端取得啟用物流的免運門檻');
+assert.ok(home.includes('超商滿 NT$') && home.includes('宅配滿 NT$') && home.includes('結帳時依配送方式計算'), '未選物流時必須提示各類免運門檻，不得直接宣告免運');
+assert.ok(!home.includes('subtotal >= 1500') && !home.includes('再買 NT$ ${freeLeft}') && !home.includes('🎉 已達免運門檻！'), '首頁購物車不得使用寫死門檻或在未選物流時宣告免運');
 assert.ok(checkout.includes('loadStorefrontCatalog(true)') && checkout.includes('applyCheckoutCatalog(catalog)'), '結帳頁必須使用首頁同一份商品目錄快照');
 assert.ok(home.includes('function cartProduct(key)') && home.includes('const cartKey = c.product_no'), '首頁購物車必須以固定商品編號保存');
 assert.ok(checkout.includes('function checkoutProduct(key)') && checkout.includes("sessionStorage.setItem('cart', JSON.stringify(cart))"), '結帳頁必須依商品編號解析並遷移舊購物車');
