@@ -6,6 +6,24 @@
   const CATALOG_KEY = 'ibuy-storefront-catalog-v1';
   const CAMPAIGN_CONTEXT_KEY = 'ibuy-campaign-context';
 
+  function campaignDate(value) {
+    return new Date(value).toLocaleDateString('zh-TW', { year: 'numeric', month: 'long', day: 'numeric' });
+  }
+
+  function hydrateCampaignFromUrl() {
+    const params = new URLSearchParams(location.search);
+    const campaign = { id:params.get('campaign'), partner_name:params.get('group'), name:params.get('name'), discount_code:params.get('code'), starts_at:params.get('start'), ends_at:params.get('end') };
+    if (!campaign.id || !campaign.partner_name || !campaign.name || !campaign.discount_code || !campaign.starts_at || !campaign.ends_at) return;
+    const now = Date.now();
+    campaign.status = now < Date.parse(campaign.starts_at) ? 'upcoming' : now > Date.parse(campaign.ends_at) ? 'ended' : 'active';
+    sessionStorage.setItem(CAMPAIGN_CONTEXT_KEY, JSON.stringify(campaign));
+    document.getElementById('campaignTitle').textContent = `${campaign.partner_name}｜${campaign.name}`;
+    document.getElementById('campaignPeriod').textContent = `活動期間：${campaignDate(campaign.starts_at)} ～ ${campaignDate(campaign.ends_at)}`;
+    document.getElementById('campaignCode').textContent = campaign.discount_code;
+    document.getElementById('campaignStatus').textContent = campaign.status === 'active' ? '團購進行中' : campaign.status === 'upcoming' ? '團購即將開始' : '團購活動已結束';
+    document.getElementById('campaignBanner').hidden = false;
+  }
+
   function fixCampaignBannerLayout() {
     if (!document.getElementById('campaignBanner')) return;
     const style = document.createElement('style');
@@ -82,6 +100,7 @@
 
   window.STOREFRONT_CATALOG_KEY = CATALOG_KEY;
   window.loadStorefrontCatalog = loadStorefrontCatalog;
+  window.addEventListener('DOMContentLoaded', hydrateCampaignFromUrl);
   window.addEventListener('DOMContentLoaded', fixCampaignBannerLayout);
   window.addEventListener('DOMContentLoaded', checkoutCampaign);
 })();

@@ -27,23 +27,18 @@ function showReport(report) {
   document.querySelector('#paid').textContent = report.paid_orders;
   document.querySelector('#revenue').textContent = money(report.net_product_amount);
   document.querySelector('#commission').textContent = money(report.commission_amount);
-  document.querySelector('#rows').innerHTML = `<tr><td>已付款且未退款</td><td>${report.paid_orders}</td><td>${money(report.product_amount)}</td><td>${money(report.discount_amount)}</td><td>${money(report.net_product_amount)}</td></tr><tr><td>取消／退款</td><td>${report.cancelled_orders}</td><td>—</td><td>—</td><td>—</td></tr>`;
+  document.querySelector('#rows').innerHTML = `<tr><td>已付款</td><td>${report.paid_orders}</td><td>${money(report.product_amount)}</td><td>${money(report.discount_amount)}</td><td>${money(report.net_product_amount)}</td></tr><tr><td>未付款／匯款待確認</td><td>${report.pending_orders}</td><td>—</td><td>—</td><td>—</td></tr>`;
 }
 
 async function renderCloud() {
-  const response = await fetch(`${config.supabaseUrl}/rest/v1/rpc/partner_monthly_report`, {
+  const response = await fetch('/.netlify/functions/partner-report', {
     method: 'POST',
-    headers: {
-      apikey: config.supabaseAnonKey,
-      Authorization: `Bearer ${config.supabaseAnonKey}`,
-      'Content-Type': 'application/json'
-    },
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ access_token: token, report_year: Number(year.value), report_month: Number(month.value) })
   });
   if (!response.ok) throw new Error('報表讀取失敗');
-  const reports = await response.json();
-  if (!reports.length) return showError();
-  showReport(reports[0]);
+  const report = await response.json();
+  showReport(report);
 }
 
 function renderLocal() {
