@@ -104,8 +104,9 @@ assert.ok(checkout.includes("fetch('/.netlify/functions/discount-validate'") && 
 assert.ok(discountValidate.includes('validateDiscount') && orderHelper.includes('Number(order.discount_amount) !== discountAmount'), '折扣金額必須在顯示與建單時由伺服器驗證');
 assert.ok(app.includes('複製客人連結') && app.includes('campaignStorefrontLink'), '團購後台必須提供客人專屬前台連結');
 assert.ok(app.includes('group:item.partner_name') && storefront.includes('hydrateCampaignFromUrl'), '新團購連結必須能立即顯示團購資訊，不等待網路回應');
+assert.ok(storefront.includes("sessionStorage.getItem(CAMPAIGN_CONTEXT_KEY)"), '從結帳返回首頁時必須保留團購名稱與活動期間');
 assert.ok(home.includes('id="campaignBanner"') && home.includes('loadCampaignLanding()') && home.includes('campaign.partner_name'), '團購前台必須顯示團購主、活動名稱與期間');
-assert.ok(storefront.includes('ibuy-campaign-context') && storefront.includes('window.applyDiscountCode()'), '團購來源與專屬折扣碼必須保留到結帳頁並自動套用');
+assert.ok(storefront.includes('ibuy-campaign-context') && storefront.includes('請自行輸入使用') && !storefront.includes('window.applyDiscountCode()'), '結帳頁必須提示專屬折扣碼，但不可替客人自動套用');
 assert.ok(campaignPublic.includes('enabled=eq.true') && !campaignPublic.includes('report_token'), '公開團購端點只能回傳啟用活動且不可洩漏報表權杖');
 assert.ok(ecpayCheckout.includes('payload: validatedPayload'), '綠界付款完成後必須使用付款初始化時驗證過的商品快照');
 assert.ok(checkout.includes('async function requestEcpaySignature') && checkout.includes('!response.ok || !result.CheckMacValue'), '結帳頁必須攔截後端價格驗證與簽章錯誤');
