@@ -311,19 +311,31 @@ function openManualOrder() {
   $('#editorFields').innerHTML=`<div class="wide manual-order-help">適用於 LINE、Facebook、Instagram 或電話私訊訂單；不使用綠界金流。選擇寄送時會套用目前物流運費，之後可從訂單清單建立綠界物流單。</div>${input('customer_name','客戶姓名','',{required:true})}${input('customer_email','Email（選填）','',{type:'email'})}${input('contact_type','主要聯繫管道','line',{type:'select',choices:[['line','LINE'],['facebook','Facebook'],['instagram','Instagram'],['phone','手機電話']]})}${input('contact_value','聯繫帳號／電話','',{required:true})}${input('payment_method','收款方式','cash',{type:'select',choices:[['cash','現金'],['bank','銀行匯款']]})}${input('payment_status','付款狀態','已付款',{type:'select',choices:[['已付款','已收款'],['待付款','尚未收款'],['已匯款待確認','已匯款待確認']]})}${input('shipping_method','交付方式','meetup',{type:'select',choices:deliveryChoices})}${input('shipping_status','面交狀態','已完成',{type:'select',choices:[['已完成','已完成／已面交'],['待出貨','待處理／待出貨']]})}<div id="manualRecipientPhone" class="wide hidden">${input('recipient_phone','收件人手機（物流必填）','',{required:true})}</div><div id="manualStoreFields" class="wide field-grid hidden">${input('store_id','綠界門市代號','')}${input('store_name','門市名稱','')}${input('store_address','門市地址（選填）','',{wide:true})}</div><div id="manualHomeFields" class="wide field-grid hidden">${input('zipcode','郵遞區號','')}${input('city','縣市／區域','')}${input('address','宅配地址','',{wide:true})}</div><div class="wide"><label>商品明細</label><div id="manualItems" class="manual-items"></div><button id="addManualItem" class="secondary-button" type="button">＋ 增加商品</button></div>${input('manual_discount','優惠折扣金額',0,{type:'number',min:0,step:'1',required:true})}${input('note','備註','',{type:'textarea',wide:true})}<div class="wide manual-total"><span>商品 <b id="manualSubtotal">NT$ 0</b>　＋　運費 <b id="manualShippingFee">NT$ 0</b>　－　優惠</span><strong id="manualOrderTotal">NT$ 0</strong></div>`;
   addManualItem(); updateManualDeliveryFields(); showModal();
 }
+function openDeleteOrder(order) {
+  state.editor={type:'delete-order',order}; $('#modalTitle').textContent='刪除訂單'; $('#editorSubmit').textContent='確認刪除';
+  const logisticsWarning=order.logistics_trade_no?`<p><strong>注意：</strong>此訂單已有綠界物流單 ${escapeHtml(order.logistics_trade_no)}，刪除網站資料不會取消綠界物流單。</p>`:'';
+  $('#editorFields').innerHTML=`<div class="wide manual-order-help"><strong>訂單 ${escapeHtml(order.order_no)} 刪除後不可復原。</strong>${logisticsWarning}<p>此操作不會取消或修改任何綠界付款交易或物流單。</p></div>${input('delete_confirmation',`請輸入完整訂單編號「${escapeHtml(order.order_no)}」以確認`,'',{wide:true,required:true})}`;
+  showModal();
+}
 
 function toLocalInput(value) { if (!value) return ''; const date = new Date(value); return new Date(date.getTime() - date.getTimezoneOffset()*60000).toISOString().slice(0,16); }
 function showModal() { $('#modalBackdrop').classList.remove('hidden'); document.body.style.overflow = 'hidden'; }
-function closeModal() { $('#modalBackdrop').classList.add('hidden'); document.body.style.overflow = ''; state.editor = null; }
+function closeModal() { $('#modalBackdrop').classList.add('hidden'); document.body.style.overflow = ''; state.editor = null; $('#editorSubmit').textContent='儲存'; $('#editorSubmit').disabled=false; }
 function toast(message) { $('#toast').textContent = message; $('#toast').classList.remove('hidden'); clearTimeout(toast.timer); toast.timer = setTimeout(() => $('#toast').classList.add('hidden'), 2600); }
 function setSaving(saving) { $('#saveStatus').textContent = saving ? '儲存中…' : '資料已同步'; }
 function newId() { return crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`; }
 
 async function submitEditor(event) {
-  event.preventDefault(); setSaving(true);
+  event.preventDefault(); setSaving(true); $('#editorSubmit').disabled=true;
   try {
     const data = Object.fromEntries(new FormData(event.target));
-    if (state.editor.type === 'manual-order') {
+    let completionMessage='儲存完成';
+    if (state.editor.type === 'delete-order') {
+      const order=state.editor.order; if(data.delete_confirmation!==order.order_no)throw new Error('訂單編號不完全一致，已停止刪除');
+      if(isLocal){state.data.orders=state.data.orders.filter(item=>item.order_no!==order.order_no);localSave();}
+      else {const response=await fetch('/.netlify/functions/order-delete',{method:'POST',headers:{'Content-Type':'application/json',Authorization:`Bearer ${state.token}`},body:JSON.stringify({orderNo:order.order_no,confirmation:data.delete_confirmation})});const result=await response.json();if(!response.ok)throw new Error(result.error||'訂單刪除失敗');}
+      completionMessage='訂單已安全刪除';
+    } else if (state.editor.type === 'manual-order') {
       const items=$$('.manual-item').map(row=>({productNo:row.querySelector('.manual-product').value,qty:Number(row.querySelector('.manual-qty').value)}));
       if(!items.length||items.some(item=>!item.productNo))throw new Error('請至少選擇一項商品');
       const shippingDetails={contact_type:data.contact_type,contact_value:data.contact_value.trim()};
@@ -358,9 +370,9 @@ async function submitEditor(event) {
       if (new Date(record.ends_at) <= new Date(record.starts_at)) throw new Error('結束時間必須晚於開始時間');
       await saveRecord('campaigns', record);
     }
-    state.data = isLocal ? localLoad() : await cloudLoad(); renderAll(); closeModal(); toast('儲存完成');
+    state.data = isLocal ? localLoad() : await cloudLoad(); renderAll(); closeModal(); toast(completionMessage);
   } catch (error) { toast(error.message); }
-  finally { setSaving(false); }
+  finally { setSaving(false); $('#editorSubmit').disabled=false; }
 }
 
 async function saveShipping(event) {
@@ -390,14 +402,7 @@ document.addEventListener('click', async event => {
   const logistics = event.target.closest('[data-create-logistics]');
   if(logistics && confirm('確定要建立綠界物流單嗎？')){setSaving(true);try{const response=await fetch('/.netlify/functions/ecpay-logistics-create',{method:'POST',headers:{'Content-Type':'application/json',Authorization:`Bearer ${state.token}`},body:JSON.stringify({orderNo:logistics.dataset.createLogistics})});const result=await response.json();if(!response.ok)throw new Error(result.error||'物流建單失敗');state.data=await cloudLoad();renderOrders();toast('綠界物流單已建立');}catch(error){toast(error.message||'物流建單失敗');}finally{setSaving(false);}return;}
   const deleteOrder = event.target.closest('[data-delete-order]');
-  if(deleteOrder){
-    const order=state.data.orders.find(item=>item.order_no===deleteOrder.dataset.deleteOrder); if(!order)return;
-    if(!confirm(`警告：訂單 ${order.order_no} 刪除後不可復原。\n\n此操作不會取消或修改任何綠界付款交易或物流單。確定要繼續嗎？`))return;
-    if(order.logistics_trade_no&&!confirm(`此訂單已有綠界物流單 ${order.logistics_trade_no}。\n刪除網站資料不會取消綠界物流單，是否仍要繼續？`))return;
-    const confirmation=prompt(`請輸入完整訂單編號「${order.order_no}」以確認刪除：`);
-    if(confirmation===null)return; if(confirmation!==order.order_no){toast('訂單編號不完全一致，已停止刪除');return;}
-    setSaving(true);try{const response=await fetch('/.netlify/functions/order-delete',{method:'POST',headers:{'Content-Type':'application/json',Authorization:`Bearer ${state.token}`},body:JSON.stringify({orderNo:order.order_no,confirmation})});const result=await response.json();if(!response.ok)throw new Error(result.error||'訂單刪除失敗');state.data=await cloudLoad();renderOrders();toast('訂單已安全刪除');}catch(error){toast(error.message||'訂單刪除失敗');}finally{setSaving(false);}return;
-  }
+  if(deleteOrder){const order=state.data.orders.find(item=>item.order_no===deleteOrder.dataset.deleteOrder);if(order)openDeleteOrder(order);return;}
 });
 
 $('#chooseOrderColumns').addEventListener('click',()=>$('#orderColumnPicker').classList.toggle('hidden'));
