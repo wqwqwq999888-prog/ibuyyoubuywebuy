@@ -47,7 +47,7 @@ assert.ok(home.includes('PRODUCT_IMAGE_PLACEHOLDER') && !home.includes('oldFlavo
 
 const staticIds = new Set([...html.matchAll(/id="([^"]+)"/g)].map(match => match[1]));
 const referencedIds = new Set([...app.matchAll(/\$\('#([^']+)'\)/g)].map(match => match[1]));
-const dynamicIds = new Set(['field-name', 'field-product_no', 'imagePreview', 'productImage']);
+const dynamicIds = new Set(['field-name', 'field-product_no', 'imagePreview', 'productImage', 'manualItems', 'manualSubtotal', 'manualShippingFee', 'manualOrderTotal', 'field-manual_discount', 'field-shipping_method', 'field-shipping_status', 'manualRecipientPhone', 'field-recipient_phone', 'manualStoreFields', 'field-store_id', 'field-store_name', 'manualHomeFields', 'field-zipcode', 'field-city', 'field-address']);
 const missing = [...referencedIds].filter(id => !staticIds.has(id) && !dynamicIds.has(id));
 assert.deepEqual(missing, [], `找不到畫面元件：${missing.join(', ')}`);
 
@@ -87,6 +87,8 @@ assert.ok(checkout.includes("store711Address: document.getElementById('store711A
 assert.ok(sheetScript.includes('shippingMethodText_(order.shipping_method)') && sheetScript.includes('deliveryInfoText_(order.shipping_method, shippingDetails)'), 'Sheet 必須寫入可讀的配送方式與門市資料');
 assert.ok(sheetScript.includes("Utilities.formatDate(date, 'Asia/Taipei'") && sheetScript.includes('taipeiTimestamp_(order.created_at)'), 'Sheet 訂單時間必須轉成台北時區');
 assert.ok(sheetScript.includes("'kuroneko':'黑貓宅急便'") && sheetScript.includes("'711':'7-ELEVEN 超商取貨'"), 'Sheet 物流名稱必須與結帳頁一致');
+assert.ok(sheetScript.includes("'meetup':'面交（無物流）'"), 'Sheet 必須清楚標示手動訂單為面交');
+assert.ok(sheetScript.includes('contactText_(order)') && sheetScript.includes("instagram:'Instagram'"), 'Sheet 必須顯示手動訂單的主要聯繫管道');
 assert.ok(app.includes('shippingDetailsText(order)') && !app.includes("escapeHtml(JSON.stringify(order[key]||{}))"), '後台不得直接顯示配送 JSON');
 assert.ok(orderCreate.includes('const existing = await supabase') && orderCreate.includes('sheetSynced'), '銀行匯款建單重試不可重複建立訂單，Sheet 失敗不可誤報訂單失敗');
 assert.ok(statusSync.includes('event.headers.Authorization'), 'Netlify 管理員驗證必須兼容 Authorization header 大小寫');
@@ -133,4 +135,10 @@ assert.ok(sheetDeleteAt >= 0 && sheetDeleteAt < ordersDeleteAt && ordersDeleteAt
 assert.ok(orderDelete.includes('不在此取消或修改任何綠界交易或物流單'), '刪除 endpoint 不得取消或修改綠界交易或物流單');
 assert.ok(sheetScript.includes("request.action === 'deleteOrder'") && sheetScript.includes("headers.indexOf('訂單編號')") && sheetScript.includes("createTextOutput('DELETED')"), 'Apps Script 必須依訂單編號欄刪除整列並明確回覆 DELETED');
 assert.ok(orderHelper.includes("action === 'deleteOrder' ? 'DELETED' : 'OK'") && orderHelper.includes("if (action === 'deleteOrder') throw"), '刪除必須要求 DELETED，且未設定 Sheet webhook 時停止');
-assert.ok(html.includes('app.js?v=20260829'), 'admin/app.js 必須更新 cache bust');
+assert.ok(html.includes('app.js?v=20260912'), 'admin/app.js 必須更新 cache bust');
+const adminOrderCreate = readFileSync(new URL('../netlify/functions/admin-order-create.js', import.meta.url), 'utf8');
+assert.ok(html.includes('id="createManualOrder"') && app.includes('openManualOrder'), '訂單後台必須提供手動建立面交訂單');
+assert.ok(app.includes("['line','LINE']") && app.includes("['facebook','Facebook']") && app.includes("['instagram','Instagram']"), '手動訂單必須支援常用私訊聯繫管道');
+assert.ok(app.includes("'/.netlify/functions/admin-order-create'") && app.includes("['meetup','面交（免運）']"), '手動訂單必須支援面交並透過管理員 endpoint 建立');
+assert.ok(adminOrderCreate.includes('await requireAdmin(event)') && adminOrderCreate.includes("shippingMethod !== 'meetup'") && adminOrderCreate.includes('shippingFee = Number(method.fee)'), '手動建單 endpoint 必須驗證管理員並依交付方式計算運費');
+assert.ok(adminOrderCreate.includes('discountAmount > productAmount') && adminOrderCreate.includes('select=product_no,name,price,cost'), '手動訂單須由後端驗證商品售價、成本與折扣金額');
