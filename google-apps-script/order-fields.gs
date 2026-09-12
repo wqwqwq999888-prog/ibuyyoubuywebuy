@@ -57,7 +57,7 @@ function isOrderWebhookRequest(request) {
 }
 
 function shippingMethodText_(method) {
-  return ({'711':'7-ELEVEN 超商取貨','family':'全家 FamilyMart 超商取貨','kuroneko':'黑貓宅急便'})[method] || method || '';
+  return ({'711':'7-ELEVEN 超商取貨','family':'全家 FamilyMart 超商取貨','kuroneko':'黑貓宅急便','meetup':'面交（無物流）'})[method] || method || '';
 }
 
 function taipeiTimestamp_(value) {
@@ -75,6 +75,12 @@ function deliveryInfoText_(method, details) {
     return ['全家：' + (details.storefamily || ''), details.storefamilyAddress || ''].filter(String).join('／');
   }
   return [details.city || '', details.address || ''].filter(String).join(' ');
+}
+
+function contactText_(order) {
+  var details = order.shipping_details || {};
+  var labels = {line:'LINE',facebook:'Facebook',instagram:'Instagram',phone:'手機'};
+  return details.contact_value ? (labels[details.contact_type] || '聯繫') + '：' + details.contact_value : (order.customer_phone || '');
 }
 
 function handleOrderWebhook(e, request) {
@@ -112,7 +118,7 @@ function handleOrderWebhook(e, request) {
   }).join('、');
   var shippingDetails = order.shipping_details || {};
   var row = [
-    taipeiTimestamp_(order.created_at), order.order_no, order.customer_name, order.customer_phone,
+    taipeiTimestamp_(order.created_at), order.order_no, order.customer_name, contactText_(order),
     order.customer_email, itemsText, 'NT$ ' + order.order_amount, shippingMethodText_(order.shipping_method),
     deliveryInfoText_(order.shipping_method, shippingDetails), order.transfer_last_five,
     order.transfer_time || '', order.note, order.payment_status, order.shipping_status,
