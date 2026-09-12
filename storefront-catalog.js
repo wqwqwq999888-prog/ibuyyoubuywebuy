@@ -6,6 +6,13 @@
   const CATALOG_KEY = 'ibuy-storefront-catalog-v1';
   const CAMPAIGN_CONTEXT_KEY = 'ibuy-campaign-context';
 
+  function fixCampaignBannerLayout() {
+    if (!document.getElementById('campaignBanner')) return;
+    const style = document.createElement('style');
+    style.textContent = '.campaign-banner{margin-top:72px}@media(max-width:600px){.campaign-banner{margin-top:68px}}';
+    document.head.appendChild(style);
+  }
+
   function checkoutCampaign() {
     if (!/\/checkout(?:\.html)?$/.test(location.pathname)) return;
     let campaign;
@@ -75,5 +82,6 @@
 
   window.STOREFRONT_CATALOG_KEY = CATALOG_KEY;
   window.loadStorefrontCatalog = loadStorefrontCatalog;
+  window.addEventListener('DOMContentLoaded', fixCampaignBannerLayout);
   window.addEventListener('DOMContentLoaded', checkoutCampaign);
 })();
