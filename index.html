@@ -503,6 +503,7 @@ footer {
   section { padding: 60px 20px; }
   .cart-drawer { width: 100%; right: -100%; }
 }
+.campaign-banner{position:relative;z-index:5;display:flex;justify-content:space-between;align-items:center;gap:24px;padding:18px clamp(20px,6vw,80px);background:linear-gradient(100deg,#8a6426,#c49a4b);color:#fff}.campaign-banner[hidden]{display:none}.campaign-banner span{font-size:12px;letter-spacing:.14em}.campaign-banner strong{display:block;margin-top:4px;font-family:var(--font-display);font-size:24px}.campaign-banner p{margin:4px 0 0;font-size:13px}.campaign-code{padding:10px 15px;border:1px solid rgba(255,255,255,.5);border-radius:6px;white-space:nowrap}.campaign-code b{margin-left:8px;font-size:18px}@media(max-width:600px){.campaign-banner{align-items:flex-start;flex-direction:column;gap:12px}.campaign-code{width:100%}}
 </style>
 </head>
 <body>
@@ -524,6 +525,11 @@ footer {
     <span class="cart-badge" id="cartBadge">0</span>
   </button>
 </nav>
+
+<aside id="campaignBanner" class="campaign-banner" hidden>
+  <div><span id="campaignStatus">團購活動</span><strong id="campaignTitle"></strong><p id="campaignPeriod"></p></div>
+  <div class="campaign-code">專屬折扣碼 <b id="campaignCode"></b></div>
+</aside>
 
 <!-- HERO -->
 <div class="hero">
@@ -1025,6 +1031,23 @@ function goCheckout() {
   window.location.href = 'checkout.html';
 }
 
+const CAMPAIGN_CONTEXT_KEY = 'ibuy-campaign-context';
+function storefrontDate(value) { return new Date(value).toLocaleDateString('zh-TW',{year:'numeric',month:'long',day:'numeric'}); }
+async function loadCampaignLanding() {
+  const campaignId=new URLSearchParams(location.search).get('campaign');
+  if(!campaignId)return;
+  try {
+    const response=await fetch(`/.netlify/functions/campaign-public?id=${encodeURIComponent(campaignId)}`); const campaign=await response.json();
+    if(!response.ok)throw new Error(campaign.error||'團購活動讀取失敗');
+    sessionStorage.setItem(CAMPAIGN_CONTEXT_KEY,JSON.stringify(campaign));
+    document.getElementById('campaignTitle').textContent=`${campaign.partner_name}｜${campaign.name}`;
+    document.getElementById('campaignPeriod').textContent=`活動期間：${storefrontDate(campaign.starts_at)} ～ ${storefrontDate(campaign.ends_at)}`;
+    document.getElementById('campaignCode').textContent=campaign.discount_code;
+    document.getElementById('campaignStatus').textContent=campaign.status==='active'?'團購進行中':campaign.status==='upcoming'?'團購即將開始':'團購活動已結束';
+    document.getElementById('campaignBanner').hidden=false;
+  } catch(error) { sessionStorage.removeItem(CAMPAIGN_CONTEXT_KEY); showToast(error.message); }
+}
+
 // ── TOAST ──
 function showToast(msg) {
   const t = document.getElementById('toast');
@@ -1034,7 +1057,7 @@ function showToast(msg) {
 
 // ── INIT ──
 document.addEventListener('DOMContentLoaded', async () => {
-  const [catalog] = await Promise.all([loadStorefrontCatalog(), loadStorefrontShippingMethods()]);
+  const [catalog] = await Promise.all([loadStorefrontCatalog(), loadStorefrontShippingMethods(), loadCampaignLanding()]);
   applyStorefrontCatalog(catalog);
   renderProducts('all');
   initCombo();
