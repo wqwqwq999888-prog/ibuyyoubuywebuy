@@ -81,6 +81,7 @@ window.ADMIN_CONFIG = {
 - 綠界訂單暫存在 `pending_ecpay_orders`，只有 ReturnURL 驗證 CheckMacValue、成功代碼及金額後才轉為正式訂單；付款失敗不會進入 orders 或試算表。
 - 後台可選擇顯示欄位，選擇保存在瀏覽器；修改付款／出貨狀態會呼叫 server function 並同步試算表。
 - 訂單管理可手動建立私訊訂單：聯繫管道可選 LINE、Facebook、Instagram 或手機，選擇商品與數量並輸入優惠折扣；交付可選面交、超商店到店或宅配，面交免運，寄送則依目前物流設定計算運費。手動訂單不使用綠界金流，寄送訂單可在建立後另外產生綠界物流單。
+- 每個團購活動會產生兩個不同連結：「客人連結」顯示團購主、活動名稱、期間並將專屬折扣碼帶到結帳；「報表連結」只提供團購主查看每月銷售、實收商品金額與預估佣金。
 
 Netlify 正式環境需設定 `SUPABASE_URL`、`SUPABASE_SECRET_KEY`、`GOOGLE_SHEET_WEBHOOK_URL`、`GOOGLE_SHEET_WEBHOOK_SECRET`、`ECPAY_HASH_KEY`、`ECPAY_HASH_IV`。`sb_secret_` 僅由 server-side function 放在 `apikey` header，絕不可作為 Bearer JWT。請在 Apps Script 的 Script Properties 設定同一份 `WEBHOOK_SECRET`，不要寫入 repository 或貼在對話中。
 
