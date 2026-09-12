@@ -183,7 +183,10 @@ function renderDiscounts() {
 }
 
 function campaignLink(item) { return `${location.origin}/partner-report.html?token=${encodeURIComponent(item.report_token)}`; }
-function campaignStorefrontLink(item) { return `${location.origin}/?campaign=${encodeURIComponent(item.id)}`; }
+function campaignStorefrontLink(item) {
+  const params = new URLSearchParams({campaign:item.id,group:item.partner_name,name:item.name,code:item.discount_code,start:item.starts_at,end:item.ends_at});
+  return `${location.origin}/?${params}`;
+}
 function renderCampaigns() {
   $('#campaignRows').innerHTML = state.data.campaigns.map(item => `<tr><td><strong>${escapeHtml(item.name)}</strong><div class="cell-sub">團主：${escapeHtml(item.partner_name)} · 佣金 ${Number(item.commission_rate || 0)}%</div></td><td>${escapeHtml(item.discount_code)}</td><td>${dateText(item.starts_at)} ～ ${dateText(item.ends_at)}</td><td><div class="row-actions"><button class="row-button" data-copy="${escapeHtml(campaignStorefrontLink(item))}">複製客人連結</button><button class="row-button" data-copy="${escapeHtml(campaignLink(item))}">複製報表連結</button></div></td><td>${statusBadge(isCurrentlyActive(item), '進行中')}</td><td><div class="row-actions"><button class="row-button" data-edit="campaign" data-id="${item.id}">編輯</button><button class="row-button danger" data-delete="campaign" data-id="${item.id}">刪除</button></div></td></tr>`).join('');
   $('#campaignEmpty').classList.toggle('hidden', state.data.campaigns.length > 0);
