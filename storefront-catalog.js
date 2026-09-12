@@ -12,8 +12,12 @@
 
   function hydrateCampaignFromUrl() {
     const params = new URLSearchParams(location.search);
-    const campaign = { id:params.get('campaign'), partner_name:params.get('group'), name:params.get('name'), discount_code:params.get('code'), starts_at:params.get('start'), ends_at:params.get('end') };
-    if (!campaign.id || !campaign.partner_name || !campaign.name || !campaign.discount_code || !campaign.starts_at || !campaign.ends_at) return;
+    let campaign = { id:params.get('campaign'), partner_name:params.get('group'), name:params.get('name'), discount_code:params.get('code'), starts_at:params.get('start'), ends_at:params.get('end') };
+    if (!campaign.id) {
+      try { campaign = JSON.parse(sessionStorage.getItem(CAMPAIGN_CONTEXT_KEY) || 'null'); }
+      catch (_) { campaign = null; }
+    }
+    if (!campaign || !campaign.id || !campaign.partner_name || !campaign.name || !campaign.discount_code || !campaign.starts_at || !campaign.ends_at) return;
     const now = Date.now();
     campaign.status = now < Date.parse(campaign.starts_at) ? 'upcoming' : now > Date.parse(campaign.ends_at) ? 'ended' : 'active';
     sessionStorage.setItem(CAMPAIGN_CONTEXT_KEY, JSON.stringify(campaign));
@@ -50,20 +54,9 @@
     const title = document.createElement('strong');
     title.textContent = `${campaign.partner_name}｜${campaign.name}`;
     const code = document.createElement('span');
-    code.textContent = `專屬折扣碼 ${campaign.discount_code}`;
+    code.textContent = `專屬折扣碼 ${campaign.discount_code}（請自行輸入使用）`;
     banner.append(title, code);
     document.querySelector('nav')?.after(banner);
-
-    let attempts = 0;
-    const applyWhenReady = setInterval(async () => {
-      const input = document.getElementById('discountCode');
-      const orderItems = document.getElementById('orderItems');
-      if (++attempts > 24) return clearInterval(applyWhenReady);
-      if (!input || !orderItems?.children.length || typeof window.applyDiscountCode !== 'function') return;
-      clearInterval(applyWhenReady);
-      input.value = campaign.discount_code;
-      await window.applyDiscountCode();
-    }, 250);
   }
 
   async function loadStorefrontCatalog(preferCache = false) {
