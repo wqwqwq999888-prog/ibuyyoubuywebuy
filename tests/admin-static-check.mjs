@@ -24,7 +24,7 @@ assert.ok(app.includes("free_threshold: 3000"), '宅配免運門檻預設值應�
 assert.ok(app.includes('commission_rate'), '團購活動必須支援佣金比例');
 assert.ok(app.includes('partner-report.html?token='), '團購活動必須產生私人報表連結');
 assert.ok(report.includes('id="year"') && report.includes('id="month"'), '團購主報表必須能選年份與月份');
-assert.ok(reportScript.includes('/rest/v1/rpc/partner_monthly_report'), '雲端團購主報表必須呼叫安全的報表函式');
+assert.ok(reportScript.includes('/.netlify/functions/partner-report'), '雲端團購主報表必須呼叫安全的報表端點');
 assert.ok(config.includes("mode: 'supabase'"), '後台應使用 Supabase 雲端模式');
 assert.ok(checkout.includes('id="discountCode"'), '結帳頁必須提供折扣碼欄位');
 assert.ok(checkout.includes("fetch('/.netlify/functions/shipping-methods'") && checkout.includes('method.free_threshold'), '結帳頁必須從後端取得運費與免運門檻');
@@ -103,6 +103,7 @@ assert.ok(checkout.includes("price.textContent = '物流關閉中'") && checkout
 assert.ok(checkout.includes("fetch('/.netlify/functions/discount-validate'") && !checkout.includes('function getAvailableDiscounts'), '結帳頁必須透過伺服器驗證雲端折扣碼');
 assert.ok(discountValidate.includes('validateDiscount') && orderHelper.includes('Number(order.discount_amount) !== discountAmount'), '折扣金額必須在顯示與建單時由伺服器驗證');
 assert.ok(app.includes('複製客人連結') && app.includes('campaignStorefrontLink'), '團購後台必須提供客人專屬前台連結');
+assert.ok(app.includes('group:item.partner_name') && storefront.includes('hydrateCampaignFromUrl'), '新團購連結必須能立即顯示團購資訊，不等待網路回應');
 assert.ok(home.includes('id="campaignBanner"') && home.includes('loadCampaignLanding()') && home.includes('campaign.partner_name'), '團購前台必須顯示團購主、活動名稱與期間');
 assert.ok(storefront.includes('ibuy-campaign-context') && storefront.includes('window.applyDiscountCode()'), '團購來源與專屬折扣碼必須保留到結帳頁並自動套用');
 assert.ok(campaignPublic.includes('enabled=eq.true') && !campaignPublic.includes('report_token'), '公開團購端點只能回傳啟用活動且不可洩漏報表權杖');
