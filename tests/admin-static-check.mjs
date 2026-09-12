@@ -123,10 +123,12 @@ assert.ok(netlifyConfig.includes('no-cache, no-store, must-revalidate'), 'admin/
 assert.ok(workflow.includes('tests/*.cjs tests/*.mjs') && workflow.includes('node --check'), 'GitHub Actions 必須執行測試及語法檢查');
 
 assert.ok(app.includes('<th>操作</th>') && app.includes('data-delete-order=') && app.includes('刪除訂單'), '所有後台訂單都必須提供刪除操作');
-assert.ok(app.includes('刪除後不可復原') && app.includes('confirmation!==order.order_no'), '刪除前必須警告且要求完整訂單編號完全一致');
+assert.ok(app.includes('刪除後不可復原') && app.includes('data.delete_confirmation!==order.order_no'), '刪除前必須警告且要求完整訂單編號完全一致');
 assert.ok(app.includes('order.logistics_trade_no') && app.includes('不會取消綠界物流單'), '已有物流單時必須顯示不會取消物流單的額外警告');
 assert.ok(app.includes("'/.netlify/functions/order-delete'") && app.includes('Authorization:`Bearer ${state.token}`'), '前端必須以管理員 token 呼叫刪除 endpoint');
-assert.ok(app.includes("state.data=await cloudLoad();renderOrders();toast('訂單已安全刪除')"), '刪除成功後必須重新載入訂單與毛利統計並提示成功');
+assert.ok(app.includes("completionMessage='訂單已安全刪除'") && app.includes('state.data = isLocal ? localLoad() : await cloudLoad()'), '刪除成功後必須重新載入訂單與毛利統計並提示成功');
+assert.ok(html.includes('id="editorSubmit"') && app.includes("$('#editorSubmit').disabled=true"), '建單送出時必須停用按鈕，避免重複建立訂單');
+assert.ok(app.includes("state.editor={type:'delete-order'") && !app.includes('const confirmation=prompt('), '刪除訂單必須使用站內確認視窗，不可依賴瀏覽器 prompt');
 assert.ok(orderDelete.includes('await requireAdmin(event)') && orderDelete.includes('confirmation !== orderNo'), '刪除 endpoint 必須驗證管理員及完整訂單編號');
 const sheetDeleteAt = orderDelete.indexOf("await syncSheet({ order_no: orderNo }, 'deleteOrder')");
 const ordersDeleteAt = orderDelete.indexOf('method: \'DELETE\', headers: { Prefer: \'return=representation\' }');
