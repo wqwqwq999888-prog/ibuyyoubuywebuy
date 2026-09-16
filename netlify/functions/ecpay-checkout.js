@@ -1,5 +1,5 @@
 const crypto = require('crypto');
-const { supabase, normalizeOrder, validateProductPricing } = require('./_orders');
+const { supabase, normalizeOrder, validateProductPricing, campaignIdFromCookie } = require('./_orders');
 
 function ecpayEncode(str) {
   return encodeURIComponent(str)
@@ -35,6 +35,7 @@ exports.handler = async (event) => {
   const HASH_IV = process.env.ECPAY_HASH_IV;
 
   const request = JSON.parse(event.body || '{}');
+  if (request.order) request.order.campaignId = campaignIdFromCookie(event);
   const requestedParams = request.params || request;
   // Keep the payment payload assembled on the server.  Besides preventing the
   // browser from accidentally dropping signed fields, this also guarantees

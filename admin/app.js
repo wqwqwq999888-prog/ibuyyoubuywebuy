@@ -184,11 +184,11 @@ function renderDiscounts() {
 
 function campaignLink(item) { return `${location.origin}/partner-report.html?token=${encodeURIComponent(item.report_token)}`; }
 function campaignStorefrontLink(item) {
-  const params = new URLSearchParams({campaign:item.id,group:item.partner_name,name:item.name,code:item.discount_code,start:item.starts_at,end:item.ends_at});
+  const params = new URLSearchParams({campaign:item.id,group:item.partner_name,name:item.name,code:item.discount_code||'',start:item.starts_at,end:item.ends_at});
   return `${location.origin}/?${params}`;
 }
 function renderCampaigns() {
-  $('#campaignRows').innerHTML = state.data.campaigns.map(item => `<tr><td><strong>${escapeHtml(item.name)}</strong><div class="cell-sub">團主：${escapeHtml(item.partner_name)} · 佣金 ${Number(item.commission_rate || 0)}%</div></td><td>${escapeHtml(item.discount_code)}</td><td>${dateText(item.starts_at)} ～ ${dateText(item.ends_at)}</td><td><div class="row-actions"><button class="row-button" data-copy="${escapeHtml(campaignStorefrontLink(item))}">複製客人連結</button><button class="row-button" data-copy="${escapeHtml(campaignLink(item))}">複製報表連結</button></div></td><td>${statusBadge(isCurrentlyActive(item), '進行中')}</td><td><div class="row-actions"><button class="row-button" data-edit="campaign" data-id="${item.id}">編輯</button><button class="row-button danger" data-delete="campaign" data-id="${item.id}">刪除</button></div></td></tr>`).join('');
+  $('#campaignRows').innerHTML = state.data.campaigns.map(item => `<tr><td><strong>${escapeHtml(item.name)}</strong><div class="cell-sub">團主：${escapeHtml(item.partner_name)} · 佣金 ${Number(item.commission_rate || 0)}%</div></td><td>${item.discount_code ? escapeHtml(item.discount_code) : '無折扣碼'}</td><td>${dateText(item.starts_at)} ～ ${dateText(item.ends_at)}</td><td><div class="row-actions"><button class="row-button" data-copy="${escapeHtml(campaignStorefrontLink(item))}">複製客人連結</button><button class="row-button" data-copy="${escapeHtml(campaignLink(item))}">複製報表連結</button></div></td><td>${statusBadge(isCurrentlyActive(item), '進行中')}</td><td><div class="row-actions"><button class="row-button" data-edit="campaign" data-id="${item.id}">編輯</button><button class="row-button danger" data-delete="campaign" data-id="${item.id}">刪除</button></div></td></tr>`).join('');
   $('#campaignEmpty').classList.toggle('hidden', state.data.campaigns.length > 0);
   $('#campaignCount').textContent = state.data.campaigns.length;
   $('#activeCampaignCount').textContent = state.data.campaigns.filter(isCurrentlyActive).length;
@@ -281,8 +281,8 @@ function openDiscount(item = {}) {
 
 function openCampaign(item = {}) {
   state.editor = { type: 'campaign', originalId: item.id || '' }; $('#modalTitle').textContent = item.id ? '編輯團購活動' : '新增團購活動';
-  const discountChoices = [['','請選擇專屬折扣碼'],...state.data.discounts.map(d => [d.code,d.code])];
-  $('#editorFields').innerHTML = `${input('name','活動名稱',item.name || '',{required:true})}${input('partner_name','團主名稱',item.partner_name || '',{required:true})}${input('discount_code','專屬折扣碼',item.discount_code || '',{type:'select',choices:discountChoices})}${input('commission_rate','佣金比例（%）',item.commission_rate || 0,{type:'number',min:0,step:'0.01',required:true})}${input('starts_at','開始時間',toLocalInput(item.starts_at),{type:'datetime-local',required:true})}${input('ends_at','結束時間',toLocalInput(item.ends_at),{type:'datetime-local',required:true})}${input('enabled','狀態',String(item.enabled ?? true),{type:'select',choices:[['true','啟用'],['false','停用']]})}`;
+  const discountChoices = [['','不提供折扣碼'],...state.data.discounts.map(d => [d.code,d.code])];
+  $('#editorFields').innerHTML = `${input('name','活動名稱',item.name || '',{required:true})}${input('partner_name','團主名稱',item.partner_name || '',{required:true})}${input('discount_code','專屬折扣碼（選填）',item.discount_code || '',{type:'select',choices:discountChoices})}${input('commission_rate','佣金比例（%）',item.commission_rate || 0,{type:'number',min:0,step:'0.01',required:true})}${input('starts_at','開始時間',toLocalInput(item.starts_at),{type:'datetime-local',required:true})}${input('ends_at','結束時間',toLocalInput(item.ends_at),{type:'datetime-local',required:true})}${input('enabled','狀態',String(item.enabled ?? true),{type:'select',choices:[['true','啟用'],['false','停用']]})}`;
   showModal();
 }
 
@@ -369,8 +369,7 @@ async function submitEditor(event) {
       const record = { id:state.editor.originalId || newId(),name:data.name.trim(),code:data.code.trim().toUpperCase(),discount_type:data.discount_type,discount_value:value,minimum_amount:Number(data.minimum_amount || 0),usage_limit:Number(data.usage_limit || 0),starts_at:data.starts_at ? new Date(data.starts_at).toISOString() : null,ends_at:data.ends_at ? new Date(data.ends_at).toISOString() : null,enabled:data.enabled==='true' };
       await saveRecord('discounts', record);
     } else {
-      if (!data.discount_code) throw new Error('請選擇團購主專屬折扣碼');
-      const record = { id:state.editor.originalId || newId(),name:data.name.trim(),partner_name:data.partner_name.trim(),discount_code:data.discount_code,commission_rate:Number(data.commission_rate || 0),report_token:(state.data.campaigns.find(c=>c.id===state.editor.originalId)||{}).report_token || newId(),starts_at:new Date(data.starts_at).toISOString(),ends_at:new Date(data.ends_at).toISOString(),enabled:data.enabled==='true' };
+      const record = { id:state.editor.originalId || newId(),name:data.name.trim(),partner_name:data.partner_name.trim(),discount_code:data.discount_code||null,commission_rate:Number(data.commission_rate || 0),report_token:(state.data.campaigns.find(c=>c.id===state.editor.originalId)||{}).report_token || newId(),starts_at:new Date(data.starts_at).toISOString(),ends_at:new Date(data.ends_at).toISOString(),enabled:data.enabled==='true' };
       if (new Date(record.ends_at) <= new Date(record.starts_at)) throw new Error('結束時間必須晚於開始時間');
       await saveRecord('campaigns', record);
     }

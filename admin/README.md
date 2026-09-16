@@ -66,6 +66,8 @@ window.ADMIN_CONFIG = {
 
 ## 功能名稱
 
+團購活動的折扣碼可留空。正式資料庫須先執行 `supabase/migrations/20260916000000_optional_campaign_discount.sql`，否則無折扣碼團購無法儲存。客人從團購專屬連結下單後，訂單來源會記在配送資料的 `campaign_id`，團購報表依此彙總；折扣碼僅用於選填的優惠。
+
 側邊選單提供：
 
 1. 商品管理

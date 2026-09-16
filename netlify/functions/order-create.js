@@ -1,9 +1,11 @@
-const { supabase, normalizeOrder, validateProductPricing, addProductCosts, syncSheet } = require('./_orders');
+const { supabase, normalizeOrder, validateProductPricing, addProductCosts, syncSheet, campaignIdFromCookie } = require('./_orders');
 
 exports.handler = async event => {
   if (event.httpMethod !== 'POST') return { statusCode: 405, body: 'Method Not Allowed' };
   try {
-    const pricedOrder = await validateProductPricing(normalizeOrder(JSON.parse(event.body || '{}'), '已匯款待確認'));
+    const data = JSON.parse(event.body || '{}');
+    data.campaignId = campaignIdFromCookie(event);
+    const pricedOrder = await validateProductPricing(normalizeOrder(data, '已匯款待確認'));
     const order = await addProductCosts(pricedOrder);
     if (!/^\d{5}$/.test(order.transfer_last_five)) throw new Error('請填寫轉帳後五碼');
     const existing = await supabase(`orders?order_no=eq.${encodeURIComponent(order.order_no)}&select=*`);
