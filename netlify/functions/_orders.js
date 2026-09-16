@@ -28,7 +28,7 @@ function normalizeOrder(data, paymentStatus) {
     order_no: String(data.orderId), customer_name: String(data.customer.name), customer_phone: String(data.customer.phone),
     customer_email: String(data.customer.email), email_marketing_consent: data.emailMarketingConsent === true,
     items: data.items, product_amount: productAmount, discount_amount: discountAmount, shipping_fee: shippingFee,
-    order_amount: orderAmount, shipping_method: String(data.shipping?.method || ''), shipping_details: data.shipping || {},
+    order_amount: orderAmount, shipping_method: String(data.shipping?.method || ''), shipping_details: { ...(data.shipping || {}), campaign_id: data.campaignId || null },
     transfer_last_five: String(data.transfer5 || ''), transfer_time: data.transferTime || null, note: String(data.note || ''),
     payment_method: String(data.payment || ''), payment_status: paymentStatus, shipping_status: '待出貨',
     trade_no: String(data.tradeNo || ''), discount_code: data.discountCode || null, partner_name: data.partnerName || null
@@ -81,8 +81,27 @@ async function validateProductPricing(order) {
   order.product_amount = productAmount;
   order.discount_amount = discountAmount;
   order.discount_code = discount.code || null;
-  order.partner_name = discount.partnerName || null;
+  const campaignId = String(order.shipping_details?.campaign_id || '');
+  if (campaignId) {
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(campaignId)) throw new Error('團購來源不正確');
+    const campaigns = await supabase(`campaigns?id=eq.${encodeURIComponent(campaignId)}&enabled=eq.true&select=id,partner_name,starts_at,ends_at`);
+    const campaign = campaigns[0];
+    const now = Date.now();
+    if (!campaign || Date.parse(campaign.starts_at) > now || Date.parse(campaign.ends_at) < now) throw new Error('此團購活動目前不開放下單');
+    order.partner_name = campaign.partner_name;
+  } else {
+    order.shipping_details.campaign_id = null;
+    order.partner_name = discount.partnerName || null;
+  }
   return applyShippingPricing(order);
+}
+
+function campaignIdFromCookie(event) {
+  const cookie = event.headers?.cookie || event.headers?.Cookie || '';
+  const raw = cookie.split(';').map(part => part.trim()).find(part => part.startsWith('ibuy_campaign='));
+  if (!raw) return '';
+  try { return decodeURIComponent(raw.slice('ibuy_campaign='.length)); }
+  catch (_) { return ''; }
 }
 
 async function validateDiscount(rawCode, subtotal) {
@@ -151,4 +170,4 @@ async function requireAdmin(event) {
   return user;
 }
 
-module.exports = { supabase, normalizeOrder, applyShippingPricing, validateProductPricing, validateDiscount, addProductCosts, syncSheet, requireAdmin };
+module.exports = { supabase, normalizeOrder, applyShippingPricing, validateProductPricing, validateDiscount, addProductCosts, syncSheet, requireAdmin, campaignIdFromCookie };
