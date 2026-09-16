@@ -106,7 +106,9 @@ assert.ok(app.includes('複製客人連結') && app.includes('campaignStorefront
 assert.ok(app.includes('group:item.partner_name') && storefront.includes('hydrateCampaignFromUrl'), '新團購連結必須能立即顯示團購資訊，不等待網路回應');
 assert.ok(storefront.includes("sessionStorage.getItem(CAMPAIGN_CONTEXT_KEY)"), '從結帳返回首頁時必須保留團購名稱與活動期間');
 assert.ok(home.includes('id="campaignBanner"') && home.includes('loadCampaignLanding()') && home.includes('campaign.partner_name'), '團購前台必須顯示團購主、活動名稱與期間');
-assert.ok(storefront.includes('ibuy-campaign-context') && storefront.includes('請自行輸入使用') && !storefront.includes('window.applyDiscountCode()'), '結帳頁必須提示專屬折扣碼，但不可替客人自動套用');
+assert.ok(storefront.includes('ibuy-campaign-context') && !storefront.includes('checkout-campaign-banner') && !storefront.includes('window.applyDiscountCode()'), '結帳頁不得顯示專屬折扣碼提示或自動套用');
+assert.ok(app.includes('不提供折扣碼') && app.includes('discount_code:data.discount_code||null'), '團購活動的折扣碼必須可留空');
+assert.ok(orderHelper.includes('campaign_id: data.campaignId') && reportScript.includes('/.netlify/functions/partner-report'), '團購訂單來源不得只依賴折扣碼');
 assert.ok(campaignPublic.includes('enabled=eq.true') && !campaignPublic.includes('report_token'), '公開團購端點只能回傳啟用活動且不可洩漏報表權杖');
 assert.ok(ecpayCheckout.includes('payload: validatedPayload'), '綠界付款完成後必須使用付款初始化時驗證過的商品快照');
 assert.ok(checkout.includes('async function requestEcpaySignature') && checkout.includes('!response.ok || !result.CheckMacValue'), '結帳頁必須攔截後端價格驗證與簽章錯誤');
@@ -144,7 +146,7 @@ assert.ok(sheetDeleteAt >= 0 && sheetDeleteAt < ordersDeleteAt && ordersDeleteAt
 assert.ok(orderDelete.includes('不在此取消或修改任何綠界交易或物流單'), '刪除 endpoint 不得取消或修改綠界交易或物流單');
 assert.ok(sheetScript.includes("request.action === 'deleteOrder'") && sheetScript.includes("headers.indexOf('訂單編號')") && sheetScript.includes("createTextOutput('DELETED')"), 'Apps Script 必須依訂單編號欄刪除整列並明確回覆 DELETED');
 assert.ok(orderHelper.includes("action === 'deleteOrder' ? 'DELETED' : 'OK'") && orderHelper.includes("if (action === 'deleteOrder') throw"), '刪除必須要求 DELETED，且未設定 Sheet webhook 時停止');
-assert.ok(html.includes('app.js?v=2026091202'), 'admin/app.js 必須更新 cache bust');
+assert.ok(html.includes('app.js?v=2026091601'), 'admin/app.js 必須更新 cache bust');
 const adminOrderCreate = readFileSync(new URL('../netlify/functions/admin-order-create.js', import.meta.url), 'utf8');
 assert.ok(html.includes('id="createManualOrder"') && app.includes('openManualOrder'), '訂單後台必須提供手動建立面交訂單');
 assert.ok(app.includes("['line','LINE']") && app.includes("['facebook','Facebook']") && app.includes("['instagram','Instagram']"), '手動訂單必須支援常用私訊聯繫管道');
