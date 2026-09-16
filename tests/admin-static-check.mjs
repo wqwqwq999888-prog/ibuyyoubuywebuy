@@ -53,13 +53,13 @@ assert.deepEqual(missing, [], `找不到畫面元件：${missing.join(', ')}`);
 
 console.log('Admin static checks passed.');
 
-const ORDER_COLUMN_NAMES = ['created_at','order_no','customer_name','customer_phone','customer_email','items','order_amount','shipping_method','shipping_details','transfer_last_five','transfer_time','note','payment_status','shipping_status','trade_no','shipped_at','completed_at','product_cost','product_amount','discount_amount','shipping_fee','discount_code','partner_name','gross_profit'];
+const ORDER_COLUMN_NAMES = ['created_at','order_no','customer_name','customer_phone','customer_email','items','order_amount','shipping_method','shipping_details','transfer_last_five','transfer_time','note','payment_status','shipping_status','trade_no','shipped_at','completed_at','product_cost','product_amount','discount_amount','shipping_fee','discount_code','partner_name','commission_amount','gross_profit'];
 const migration = readFileSync(new URL('../supabase/migrations/20260825000000_order_management.sql', import.meta.url), 'utf8');
 const reconcileMigration = readFileSync(new URL('../supabase/migrations/20260825020000_reconcile_order_columns.sql', import.meta.url), 'utf8');
 const orderHelper = readFileSync(new URL('../netlify/functions/_orders.js', import.meta.url), 'utf8');
 const ecpayReturn = readFileSync(new URL('../netlify/functions/ecpay-return.js', import.meta.url), 'utf8');
-assert.ok(html.includes('訂單管理') && app.includes('ORDER_COLUMNS'), '後台必須提供 24 欄訂單管理');
-assert.equal((app.match(/\['[^']+','[^']+'\]/g) || []).filter(value => ORDER_COLUMN_NAMES.some(name => value.includes(`'${name}'`))).length, 24, '訂單欄位必須是 24 欄');
+assert.ok(html.includes('訂單管理') && app.includes('ORDER_COLUMNS'), '後台必須提供訂單管理');
+assert.equal((app.match(/\['[^']+','[^']+'\]/g) || []).filter(value => ORDER_COLUMN_NAMES.some(name => value.includes(`'${name}'`))).length, 25, '訂單欄位必須是 25 欄');
 assert.ok(checkout.includes('id="emailMarketingConsent"') && checkout.includes('emailMarketingConsent').valueOf(), 'Email 行銷同意必須獨立存在');
 assert.ok(!checkout.includes('選填，預設不勾選；不影響訂單通知'), '行銷同意旁不應顯示冗長的內部規則說明');
 assert.match(checkout, /emailMarketingConsent'\)\.checked = false/, 'Email 行銷同意每次進入結帳必須預設不勾選');
@@ -68,6 +68,9 @@ assert.match(checkout, /<div class="payment-options">[\s\S]*?<\/div>\s*<\/div>\s
 assert.match(checkout, /<!-- 折扣碼 -->[\s\S]*?<\/div>\s*<!-- 備註 -->\s*<div class="panel">/, '折扣碼、訂單備註必須是獨立 panel');
 assert.ok(checkout.includes('class="discount-entry"'), '折扣碼輸入框必須使用深色結帳頁樣式');
 assert.ok(html.includes('id="monthSales"') && html.includes('id="yearProfit"'), '訂單後台必須提供月／年銷售及淨利統計');
+assert.ok(html.includes('id="monthCommission"') && html.includes('id="yearCommission"'), '訂單後台必須顯示月／年團購主分潤');
+assert.ok(html.includes('order-finance.js?v=') && app.includes('AdminOrderFinance.orderFinance'), '訂單毛利必須扣除團購主分潤');
+assert.ok(app.includes('orders.map(order=>') && app.includes('AdminOrderFinance.monthKey(order.created_at)===selectedMonth'), '訂單清單必須依所選月份篩選');
 assert.ok(app.includes("payment_status==='已付款'") && app.includes('renderOrderSummary'), '營運統計只能計入已付款訂單');
 assert.ok(orderHelper.includes('addProductCosts') && checkout.includes('productNo:'), '正式訂單必須依商品後台成本計算毛利');
 assert.ok(orderHelper.includes('validateProductPricing') && orderHelper.includes('&enabled=eq.true&select=product_no,name,price'), '伺服器必須依已上架商品重新驗證名稱與售價');
@@ -103,6 +106,7 @@ assert.ok(checkout.includes("price.textContent = '物流關閉中'") && checkout
 assert.ok(checkout.includes("fetch('/.netlify/functions/discount-validate'") && !checkout.includes('function getAvailableDiscounts'), '結帳頁必須透過伺服器驗證雲端折扣碼');
 assert.ok(discountValidate.includes('validateDiscount') && orderHelper.includes('Number(order.discount_amount) !== discountAmount'), '折扣金額必須在顯示與建單時由伺服器驗證');
 assert.ok(app.includes('複製客人連結') && app.includes('campaignStorefrontLink'), '團購後台必須提供客人專屬前台連結');
+assert.ok(app.includes("input('order_date','訂單日期與時間'") && app.includes('orderDate:orderDate.toISOString()'), '手動建單必須可選擇並傳送訂單日期');
 assert.ok(app.includes('group:item.partner_name') && storefront.includes('hydrateCampaignFromUrl'), '新團購連結必須能立即顯示團購資訊，不等待網路回應');
 assert.ok(storefront.includes("sessionStorage.getItem(CAMPAIGN_CONTEXT_KEY)"), '從結帳返回首頁時必須保留團購名稱與活動期間');
 assert.ok(home.includes('id="campaignBanner"') && home.includes('loadCampaignLanding()') && home.includes('campaign.partner_name'), '團購前台必須顯示團購主、活動名稱與期間');
@@ -146,7 +150,7 @@ assert.ok(sheetDeleteAt >= 0 && sheetDeleteAt < ordersDeleteAt && ordersDeleteAt
 assert.ok(orderDelete.includes('不在此取消或修改任何綠界交易或物流單'), '刪除 endpoint 不得取消或修改綠界交易或物流單');
 assert.ok(sheetScript.includes("request.action === 'deleteOrder'") && sheetScript.includes("headers.indexOf('訂單編號')") && sheetScript.includes("createTextOutput('DELETED')"), 'Apps Script 必須依訂單編號欄刪除整列並明確回覆 DELETED');
 assert.ok(orderHelper.includes("action === 'deleteOrder' ? 'DELETED' : 'OK'") && orderHelper.includes("if (action === 'deleteOrder') throw"), '刪除必須要求 DELETED，且未設定 Sheet webhook 時停止');
-assert.ok(html.includes('app.js?v=2026091601'), 'admin/app.js 必須更新 cache bust');
+assert.ok(html.includes('app.js?v=2026091702'), 'admin/app.js 必須更新 cache bust');
 const adminOrderCreate = readFileSync(new URL('../netlify/functions/admin-order-create.js', import.meta.url), 'utf8');
 assert.ok(html.includes('id="createManualOrder"') && app.includes('openManualOrder'), '訂單後台必須提供手動建立面交訂單');
 assert.ok(app.includes("['line','LINE']") && app.includes("['facebook','Facebook']") && app.includes("['instagram','Instagram']"), '手動訂單必須支援常用私訊聯繫管道');

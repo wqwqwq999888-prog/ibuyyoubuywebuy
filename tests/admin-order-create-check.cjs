@@ -35,6 +35,7 @@ const event = overrides => ({
 (async () => {
   const response = await handler(event());
   assert.equal(response.statusCode, 201);
+  assert.match(inserted.created_at, /^\d{4}-\d{2}-\d{2}T/);
   assert.equal(inserted.product_amount, 1040);
   assert.equal(inserted.discount_amount, 140);
   assert.equal(inserted.order_amount, 900);
@@ -44,6 +45,14 @@ const event = overrides => ({
   assert.equal(inserted.trade_no, '');
   assert.equal(inserted.shipping_details.contact_type, 'line');
   assert.match(inserted.order_no, /^MAN-/);
+
+  const dated = await handler(event({ orderDate: '2026-09-01T03:30:00.000Z' }));
+  assert.equal(dated.statusCode, 201);
+  assert.equal(inserted.created_at, '2026-09-01T03:30:00.000Z', '手動日期應寫入正式訂單時間');
+
+  const invalidDate = await handler(event({ orderDate: '2026-02-31T03:30:00.000Z' }));
+  assert.equal(invalidDate.statusCode, 400);
+  assert.match(JSON.parse(invalidDate.body).error, /訂單日期/);
 
   const invalid = await handler(event({ discountAmount: 2000 }));
   assert.equal(invalid.statusCode, 400);
