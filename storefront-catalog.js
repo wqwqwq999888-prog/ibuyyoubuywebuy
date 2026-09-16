@@ -11,19 +11,32 @@
   }
 
   function hydrateCampaignFromUrl() {
+    const banner = document.getElementById('campaignBanner');
+    if (!banner) return;
+    const syncCampaign = () => {
+      let current;
+      try { current = JSON.parse(sessionStorage.getItem(CAMPAIGN_CONTEXT_KEY) || 'null'); }
+      catch (_) { current = null; }
+      if (!current?.id) return;
+      document.cookie = `ibuy_campaign=${encodeURIComponent(current.id)}; Path=/; SameSite=Lax`;
+      document.querySelector('.campaign-code').hidden = !current.discount_code;
+    };
+    new MutationObserver(syncCampaign).observe(banner, { attributes:true, attributeFilter:['hidden'] });
     const params = new URLSearchParams(location.search);
     let campaign = { id:params.get('campaign'), partner_name:params.get('group'), name:params.get('name'), discount_code:params.get('code'), starts_at:params.get('start'), ends_at:params.get('end') };
     if (!campaign.id) {
       try { campaign = JSON.parse(sessionStorage.getItem(CAMPAIGN_CONTEXT_KEY) || 'null'); }
       catch (_) { campaign = null; }
     }
-    if (!campaign || !campaign.id || !campaign.partner_name || !campaign.name || !campaign.discount_code || !campaign.starts_at || !campaign.ends_at) return;
+    if (!campaign || !campaign.id || !campaign.partner_name || !campaign.name || !campaign.starts_at || !campaign.ends_at) return;
     const now = Date.now();
     campaign.status = now < Date.parse(campaign.starts_at) ? 'upcoming' : now > Date.parse(campaign.ends_at) ? 'ended' : 'active';
     sessionStorage.setItem(CAMPAIGN_CONTEXT_KEY, JSON.stringify(campaign));
+    syncCampaign();
     document.getElementById('campaignTitle').textContent = `${campaign.partner_name}｜${campaign.name}`;
     document.getElementById('campaignPeriod').textContent = `活動期間：${campaignDate(campaign.starts_at)} ～ ${campaignDate(campaign.ends_at)}`;
-    document.getElementById('campaignCode').textContent = campaign.discount_code;
+    document.getElementById('campaignCode').textContent = campaign.discount_code || '';
+    document.querySelector('.campaign-code').hidden = !campaign.discount_code;
     document.getElementById('campaignStatus').textContent = campaign.status === 'active' ? '團購進行中' : campaign.status === 'upcoming' ? '團購即將開始' : '團購活動已結束';
     document.getElementById('campaignBanner').hidden = false;
   }
@@ -33,30 +46,6 @@
     const style = document.createElement('style');
     style.textContent = '.campaign-banner{margin-top:72px}@media(max-width:600px){.campaign-banner{margin-top:68px}}';
     document.head.appendChild(style);
-  }
-
-  function checkoutCampaign() {
-    if (!/\/checkout(?:\.html)?$/.test(location.pathname)) return;
-    let campaign;
-    try {
-      campaign = JSON.parse(sessionStorage.getItem(CAMPAIGN_CONTEXT_KEY) || 'null');
-    } catch (_) {
-      return;
-    }
-    if (!campaign || !campaign.discount_code) return;
-
-    const style = document.createElement('style');
-    style.textContent = '.checkout-campaign-banner{display:flex;justify-content:space-between;gap:20px;max-width:1100px;margin:18px auto 0;padding:14px 20px;border:1px solid var(--gold);background:rgba(184,138,59,.1);color:var(--cream)}.checkout-campaign-banner span{color:var(--gold)}@media(max-width:600px){.checkout-campaign-banner{margin-inline:16px;flex-direction:column;gap:5px}}';
-    document.head.appendChild(style);
-
-    const banner = document.createElement('aside');
-    banner.className = 'checkout-campaign-banner';
-    const title = document.createElement('strong');
-    title.textContent = `${campaign.partner_name}｜${campaign.name}`;
-    const code = document.createElement('span');
-    code.textContent = `專屬折扣碼 ${campaign.discount_code}（請自行輸入使用）`;
-    banner.append(title, code);
-    document.querySelector('nav')?.after(banner);
   }
 
   async function loadStorefrontCatalog(preferCache = false) {
@@ -95,5 +84,4 @@
   window.loadStorefrontCatalog = loadStorefrontCatalog;
   window.addEventListener('DOMContentLoaded', hydrateCampaignFromUrl);
   window.addEventListener('DOMContentLoaded', fixCampaignBannerLayout);
-  window.addEventListener('DOMContentLoaded', checkoutCampaign);
 })();
