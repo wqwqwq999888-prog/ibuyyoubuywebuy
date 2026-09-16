@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="styles.css?v=2026091702">
 </head>
 <body>
   <div id="loginView" class="login-shell hidden">
@@ -115,20 +115,22 @@
 
       <section id="ordersPage" class="page">
         <div class="order-report-toolbar">
-          <label>統計月份 <input id="orderReportMonth" type="month"></label>
-          <span>銷售額與淨利只計入付款狀態為「已付款」的訂單。</span>
+          <label>訂單月份 <input id="orderReportMonth" type="month"></label>
+          <span>清單只顯示所選月份；銷售、分潤與毛利只統計「已付款」訂單。</span>
         </div>
         <div class="summary-grid order-summary-grid">
-          <article class="summary-card"><span>本月銷售額</span><strong id="monthSales">NT$ 0</strong><small id="monthPaidOrders">0 筆已付款</small></article>
-          <article class="summary-card"><span>本月淨利</span><strong id="monthProfit">NT$ 0</strong><small>銷售額扣除運費與商品成本</small></article>
-          <article class="summary-card"><span>本年銷售額</span><strong id="yearSales">NT$ 0</strong><small id="yearPaidOrders">0 筆已付款</small></article>
-          <article class="summary-card"><span>本年淨利</span><strong id="yearProfit">NT$ 0</strong><small>依商品後台成本計算</small></article>
+          <article class="summary-card"><span>所選月份銷售額</span><strong id="monthSales">NT$ 0</strong><small id="monthPaidOrders">0 筆已付款</small></article>
+          <article class="summary-card"><span>所選月份團購主分潤</span><strong id="monthCommission">NT$ 0</strong><small>已付款團購訂單，依折扣後商品金額計算</small></article>
+          <article class="summary-card"><span>所選月份分潤後毛利</span><strong id="monthProfit">NT$ 0</strong><small>原毛利再扣除團購主分潤</small></article>
+          <article class="summary-card"><span>所選年度銷售額</span><strong id="yearSales">NT$ 0</strong><small id="yearPaidOrders">0 筆已付款</small></article>
+          <article class="summary-card"><span>所選年度團購主分潤</span><strong id="yearCommission">NT$ 0</strong><small>依目前團購活動分潤比例估算</small></article>
+          <article class="summary-card"><span>所選年度分潤後毛利</span><strong id="yearProfit">NT$ 0</strong><small>未扣實際物流及金流等費用</small></article>
         </div>
         <div class="panel">
           <div class="panel-toolbar"><div><h2>訂單清單</h2><p>Supabase 為主資料；狀態異動會由伺服器同步至 Google Sheet。</p></div><div class="row-actions"><button id="createManualOrder" class="primary-button" type="button">手動建單</button><button id="chooseOrderColumns" class="secondary-button" type="button">選擇顯示欄位</button></div></div>
           <div id="orderColumnPicker" class="column-picker hidden"></div>
           <div class="table-wrap"><table><thead id="orderHead"></thead><tbody id="orderRows"></tbody></table></div>
-          <div id="orderEmpty" class="empty-state hidden">目前沒有正式訂單。</div>
+          <div id="orderEmpty" class="empty-state hidden">所選月份沒有訂單。</div>
         </div>
       </section>
     </main>
@@ -144,6 +146,7 @@
   <div id="toast" class="toast hidden"></div>
   <script src="config.js"></script>
   <script src="seed.js"></script>
-  <script src="app.js?v=2026091601"></script>
+  <script src="order-finance.js?v=2026091701"></script>
+  <script src="app.js?v=2026091702"></script>
 </body>
 </html>

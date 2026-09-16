@@ -17,6 +17,8 @@ exports.handler = async event => {
   try {
     await requireAdmin(event);
     const data = JSON.parse(event.body || '{}');
+    const orderDate = data.orderDate == null ? new Date() : new Date(data.orderDate);
+    if (Number.isNaN(orderDate.getTime()) || (data.orderDate != null && (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?Z$/.test(String(data.orderDate)) || orderDate.toISOString().slice(0,19) !== String(data.orderDate).slice(0,19)))) throw new Error('訂單日期與時間不正確');
     const customer = data.customer || {};
     const contact = data.contact || {};
     if (!String(customer.name || '').trim()) throw new Error('請填寫客戶姓名');
@@ -57,7 +59,7 @@ exports.handler = async event => {
       if (productAmount - discountAmount < Number(method.free_threshold)) shippingFee = Number(method.fee);
     }
     const order = {
-      order_no: manualOrderNo(), customer_name: String(customer.name).trim(), customer_phone: String(customer.phone).trim(),
+      order_no: manualOrderNo(), created_at: orderDate.toISOString(), customer_name: String(customer.name).trim(), customer_phone: String(customer.phone).trim(),
       customer_email: String(customer.email || '').trim(), email_marketing_consent: false, items,
       product_amount: productAmount, discount_amount: discountAmount, shipping_fee: shippingFee, order_amount: productAmount - discountAmount + shippingFee,
       shipping_method: shippingMethod, shipping_details: shippingDetails, transfer_last_five: '', transfer_time: null,

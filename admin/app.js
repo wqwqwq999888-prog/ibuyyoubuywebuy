@@ -199,9 +199,9 @@ const ORDER_COLUMNS = [
   ['items','商品明細'],['order_amount','訂單總額'],['shipping_method','配送方式'],['shipping_details','配送資料'],['transfer_last_five','匯款後五碼'],
   ['transfer_time','匯款時間'],['note','備註'],['payment_status','付款狀態'],['shipping_status','出貨狀態'],['trade_no','金流交易號'],
   ['shipped_at','出貨時間'],['completed_at','完成時間'],['product_cost','商品成本'],['product_amount','商品金額'],['discount_amount','折扣金額'],
-  ['shipping_fee','運費'],['discount_code','折扣碼'],['partner_name','團購主'],['gross_profit','毛利']
+  ['shipping_fee','運費'],['discount_code','折扣碼'],['partner_name','團購主'],['commission_amount','團購主分潤'],['gross_profit','分潤後毛利']
 ];
-const ORDER_COLUMN_KEY = 'ibuy-admin-order-columns-v1';
+const ORDER_COLUMN_KEY = 'ibuy-admin-order-columns-v2';
 function selectedOrderColumns() { try { const saved=JSON.parse(localStorage.getItem(ORDER_COLUMN_KEY)); return Array.isArray(saved)&&saved.length?saved:ORDER_COLUMNS.map(c=>c[0]); } catch { return ORDER_COLUMNS.map(c=>c[0]); } }
 function shippingMethodText(method) { return ({'711':'7-11超商取貨','family':'全家超商取貨','kuroneko':'黑貓宅配','meetup':'面交（無物流）'})[method] || method || '—'; }
 function shippingDetailsText(order) {
@@ -218,30 +218,40 @@ function orderCell(order, key) {
   if (key === 'shipping_method') return escapeHtml(shippingMethodText(order[key]));
   if (key === 'shipping_details') return `${escapeHtml(shippingDetailsText(order))}${canCreateLogistics(order)?`<br><button class="row-button" data-create-logistics="${escapeHtml(order.order_no)}">建立綠界物流單</button>`:order.logistics_trade_no?`<div class="cell-sub">物流單號：${escapeHtml(order.logistics_trade_no)}／${escapeHtml(order.logistics_message||order.logistics_status||'已建立')}</div>`:''}`;
   if (key === 'customer_phone') { const details=order.shipping_details||{}; return escapeHtml(details.contact_value ? `${({line:'LINE',facebook:'Facebook',instagram:'Instagram',phone:'手機'})[details.contact_type]||'聯繫'}：${details.contact_value}` : order.customer_phone || '—'); }
-  if (['order_amount','product_cost','product_amount','discount_amount','shipping_fee','gross_profit'].includes(key)) return money(order[key]);
+  if (key === 'commission_amount') return money(AdminOrderFinance.orderFinance(order, state.data.campaigns).commission);
+  if (key === 'gross_profit') return money(AdminOrderFinance.orderFinance(order, state.data.campaigns).profitAfterCommission);
+  if (['order_amount','product_cost','product_amount','discount_amount','shipping_fee'].includes(key)) return money(order[key]);
   if (key.endsWith('_at') || key === 'transfer_time') return order[key] ? new Date(order[key]).toLocaleString('zh-TW') : '—';
   return escapeHtml(order[key] ?? '—');
 }
 function renderOrders() {
+  const selectedMonth=selectedOrderMonth();
+  const orders=(state.data.orders||[]).filter(order=>AdminOrderFinance.monthKey(order.created_at)===selectedMonth);
   const visible=selectedOrderColumns(); const columns=ORDER_COLUMNS.filter(([key])=>visible.includes(key));
   $('#orderHead').innerHTML=`<tr>${columns.map(([,label])=>`<th>${label}</th>`).join('')}<th>操作</th></tr>`;
-  $('#orderRows').innerHTML=(state.data.orders||[]).map(order=>`<tr>${columns.map(([key])=>`<td>${orderCell(order,key)}</td>`).join('')}<td><button class="row-button danger" data-delete-order="${escapeHtml(order.order_no)}">刪除訂單</button></td></tr>`).join('');
-  $('#orderEmpty').classList.toggle('hidden',(state.data.orders||[]).length>0);
+  $('#orderRows').innerHTML=orders.map(order=>`<tr>${columns.map(([key])=>`<td>${orderCell(order,key)}</td>`).join('')}<td><button class="row-button danger" data-delete-order="${escapeHtml(order.order_no)}">刪除訂單</button></td></tr>`).join('');
+  $('#orderEmpty').classList.toggle('hidden',orders.length>0);
   $('#orderColumnPicker').innerHTML=ORDER_COLUMNS.map(([key,label])=>`<label><input type="checkbox" value="${key}" ${visible.includes(key)?'checked':''}> ${label}</label>`).join('');
   renderOrderSummary();
 }
+function selectedOrderMonth() {
+  if (!$('#orderReportMonth').value) $('#orderReportMonth').value=AdminOrderFinance.monthKey(new Date());
+  return $('#orderReportMonth').value;
+}
 function renderOrderSummary() {
-  const now=new Date();
-  if(!$('#orderReportMonth').value) $('#orderReportMonth').value=`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
-  const [year,month]=$('#orderReportMonth').value.split('-').map(Number);
+  const selectedMonth=selectedOrderMonth();
+  const selectedYear=selectedMonth.slice(0,4);
   const paid=(state.data.orders||[]).filter(order=>order.payment_status==='已付款');
-  const inYear=paid.filter(order=>new Date(order.created_at).getFullYear()===year);
-  const inMonth=inYear.filter(order=>new Date(order.created_at).getMonth()+1===month);
+  const inYear=paid.filter(order=>AdminOrderFinance.monthKey(order.created_at).startsWith(`${selectedYear}-`));
+  const inMonth=inYear.filter(order=>AdminOrderFinance.monthKey(order.created_at)===selectedMonth);
   const sum=(orders,key)=>orders.reduce((total,order)=>total+Number(order[key]||0),0);
+  const financeSum=(orders,key)=>orders.reduce((total,order)=>total+AdminOrderFinance.orderFinance(order,state.data.campaigns)[key],0);
   $('#monthSales').textContent=money(sum(inMonth,'order_amount'));
-  $('#monthProfit').textContent=money(sum(inMonth,'gross_profit'));
+  $('#monthCommission').textContent=money(financeSum(inMonth,'commission'));
+  $('#monthProfit').textContent=money(financeSum(inMonth,'profitAfterCommission'));
   $('#yearSales').textContent=money(sum(inYear,'order_amount'));
-  $('#yearProfit').textContent=money(sum(inYear,'gross_profit'));
+  $('#yearCommission').textContent=money(financeSum(inYear,'commission'));
+  $('#yearProfit').textContent=money(financeSum(inYear,'profitAfterCommission'));
   $('#monthPaidOrders').textContent=`${inMonth.length} 筆已付款`;
   $('#yearPaidOrders').textContent=`${inYear.length} 筆已付款`;
 }
@@ -312,7 +322,7 @@ function updateManualDeliveryFields() {
 function openManualOrder() {
   state.editor={type:'manual-order'}; $('#modalTitle').textContent='手動建單';
   const deliveryChoices=[['meetup','面交（免運）'],...state.data.shipping_methods.filter(item=>item.enabled).map(item=>[item.id,item.name])];
-  $('#editorFields').innerHTML=`<div class="wide manual-order-help">適用於 LINE、Facebook、Instagram 或電話私訊訂單；不使用綠界金流。選擇寄送時會套用目前物流運費，之後可從訂單清單建立綠界物流單。</div>${input('customer_name','客戶姓名','',{required:true})}${input('customer_email','Email（選填）','',{type:'email'})}${input('contact_type','主要聯繫管道','line',{type:'select',choices:[['line','LINE'],['facebook','Facebook'],['instagram','Instagram'],['phone','手機電話']]})}${input('contact_value','聯繫帳號／電話','',{required:true})}${input('payment_method','收款方式','cash',{type:'select',choices:[['cash','現金'],['bank','銀行匯款']]})}${input('payment_status','付款狀態','已付款',{type:'select',choices:[['已付款','已收款'],['待付款','尚未收款'],['已匯款待確認','已匯款待確認']]})}${input('shipping_method','交付方式','meetup',{type:'select',choices:deliveryChoices})}${input('shipping_status','面交狀態','已完成',{type:'select',choices:[['已完成','已完成／已面交'],['待出貨','待處理／待出貨']]})}<div id="manualRecipientPhone" class="wide hidden">${input('recipient_phone','收件人手機（物流必填）','',{required:true})}</div><div id="manualStoreFields" class="wide field-grid hidden">${input('store_id','綠界門市代號','')}${input('store_name','門市名稱','')}${input('store_address','門市地址（選填）','',{wide:true})}</div><div id="manualHomeFields" class="wide field-grid hidden">${input('zipcode','郵遞區號','')}${input('city','縣市／區域','')}${input('address','宅配地址','',{wide:true})}</div><div class="wide"><label>商品明細</label><div id="manualItems" class="manual-items"></div><button id="addManualItem" class="secondary-button" type="button">＋ 增加商品</button></div>${input('manual_discount','優惠折扣金額',0,{type:'number',min:0,step:'1',required:true})}${input('note','備註','',{type:'textarea',wide:true})}<div class="wide manual-total"><span>商品 <b id="manualSubtotal">NT$ 0</b>　＋　運費 <b id="manualShippingFee">NT$ 0</b>　－　優惠</span><strong id="manualOrderTotal">NT$ 0</strong></div>`;
+  $('#editorFields').innerHTML=`<div class="wide manual-order-help">適用於 LINE、Facebook、Instagram 或電話私訊訂單；不使用綠界金流。選擇寄送時會套用目前物流運費，之後可從訂單清單建立綠界物流單。</div>${input('order_date','訂單日期與時間',toLocalInput(new Date()),{type:'datetime-local',required:true})}${input('customer_name','客戶姓名','',{required:true})}${input('customer_email','Email（選填）','',{type:'email'})}${input('contact_type','主要聯繫管道','line',{type:'select',choices:[['line','LINE'],['facebook','Facebook'],['instagram','Instagram'],['phone','手機電話']]})}${input('contact_value','聯繫帳號／電話','',{required:true})}${input('payment_method','收款方式','cash',{type:'select',choices:[['cash','現金'],['bank','銀行匯款']]})}${input('payment_status','付款狀態','已付款',{type:'select',choices:[['已付款','已收款'],['待付款','尚未收款'],['已匯款待確認','已匯款待確認']]})}${input('shipping_method','交付方式','meetup',{type:'select',choices:deliveryChoices})}${input('shipping_status','面交狀態','已完成',{type:'select',choices:[['已完成','已完成／已面交'],['待出貨','待處理／待出貨']]})}<div id="manualRecipientPhone" class="wide hidden">${input('recipient_phone','收件人手機（物流必填）','',{required:true})}</div><div id="manualStoreFields" class="wide field-grid hidden">${input('store_id','綠界門市代號','')}${input('store_name','門市名稱','')}${input('store_address','門市地址（選填）','',{wide:true})}</div><div id="manualHomeFields" class="wide field-grid hidden">${input('zipcode','郵遞區號','')}${input('city','縣市／區域','')}${input('address','宅配地址','',{wide:true})}</div><div class="wide"><label>商品明細</label><div id="manualItems" class="manual-items"></div><button id="addManualItem" class="secondary-button" type="button">＋ 增加商品</button></div>${input('manual_discount','優惠折扣金額',0,{type:'number',min:0,step:'1',required:true})}${input('note','備註','',{type:'textarea',wide:true})}<div class="wide manual-total"><span>商品 <b id="manualSubtotal">NT$ 0</b>　＋　運費 <b id="manualShippingFee">NT$ 0</b>　－　優惠</span><strong id="manualOrderTotal">NT$ 0</strong></div>`;
   addManualItem(); updateManualDeliveryFields(); showModal();
 }
 function openDeleteOrder(order) {
@@ -340,19 +350,21 @@ async function submitEditor(event) {
       else {const response=await fetch('/.netlify/functions/order-delete',{method:'POST',headers:{'Content-Type':'application/json',Authorization:`Bearer ${state.token}`},body:JSON.stringify({orderNo:order.order_no,confirmation:data.delete_confirmation})});const result=await response.json();if(!response.ok)throw new Error(result.error||'訂單刪除失敗');}
       completionMessage='訂單已安全刪除';
     } else if (state.editor.type === 'manual-order') {
+      const orderDate=new Date(data.order_date);
+      if(!data.order_date||Number.isNaN(orderDate.getTime()))throw new Error('請填寫有效的訂單日期與時間');
       const items=$$('.manual-item').map(row=>({productNo:row.querySelector('.manual-product').value,qty:Number(row.querySelector('.manual-qty').value)}));
       if(!items.length||items.some(item=>!item.productNo))throw new Error('請至少選擇一項商品');
       const shippingDetails={contact_type:data.contact_type,contact_value:data.contact_value.trim()};
       if(['711','family'].includes(data.shipping_method)){const prefix=data.shipping_method==='711'?'store711':'storefamily';shippingDetails[`${prefix}Id`]=data.store_id.trim();shippingDetails[prefix]=data.store_name.trim();shippingDetails[`${prefix}Address`]=data.store_address.trim();}
       if(data.shipping_method==='kuroneko')Object.assign(shippingDetails,{zipcode:data.zipcode.trim(),city:data.city.trim(),address:data.address.trim()});
       const customerPhone=data.shipping_method==='meetup'?(data.contact_type==='phone'?data.contact_value.trim():''):data.recipient_phone.trim();
-      const payload={customer:{name:data.customer_name.trim(),phone:customerPhone,email:data.customer_email.trim()},contact:{type:data.contact_type,value:data.contact_value.trim()},items,discountAmount:Number(data.manual_discount||0),paymentMethod:data.payment_method,paymentStatus:data.payment_status,shippingStatus:data.shipping_status,shipping:{method:data.shipping_method,details:shippingDetails},note:data.note.trim()};
+      const payload={orderDate:orderDate.toISOString(),customer:{name:data.customer_name.trim(),phone:customerPhone,email:data.customer_email.trim()},contact:{type:data.contact_type,value:data.contact_value.trim()},items,discountAmount:Number(data.manual_discount||0),paymentMethod:data.payment_method,paymentStatus:data.payment_status,shippingStatus:data.shipping_status,shipping:{method:data.shipping_method,details:shippingDetails},note:data.note.trim()};
       if(isLocal){
         const merged=new Map(); items.forEach(item=>merged.set(item.productNo,(merged.get(item.productNo)||0)+item.qty));
         const orderItems=[...merged].map(([productNo,qty])=>{const product=state.data.products.find(item=>String(item.product_no)===productNo);return {productNo,name:product.name,price:Number(product.price),qty};});
         const productAmount=orderItems.reduce((sum,item)=>sum+item.price*item.qty,0); if(payload.discountAmount>productAmount)throw new Error('折扣金額不可超過商品小計');
         const productCost=orderItems.reduce((sum,item)=>{const product=state.data.products.find(p=>String(p.product_no)===item.productNo);return sum+Number(product.cost||0)*item.qty;},0); const method=state.data.shipping_methods.find(item=>item.id===payload.shipping.method); const discounted=productAmount-payload.discountAmount; const shippingFee=payload.shipping.method==='meetup'||discounted>=Number(method.free_threshold)?0:Number(method.fee);
-        state.data.orders.unshift({order_no:`MAN-${Date.now()}`,created_at:new Date().toISOString(),customer_name:payload.customer.name,customer_phone:payload.customer.phone,customer_email:payload.customer.email,items:orderItems,product_amount:productAmount,discount_amount:payload.discountAmount,shipping_fee:shippingFee,order_amount:discounted+shippingFee,shipping_method:payload.shipping.method,shipping_details:payload.shipping.details,transfer_last_five:'',transfer_time:null,note:payload.note,payment_method:payload.paymentMethod,payment_status:payload.paymentStatus,shipping_status:payload.shippingStatus,trade_no:'',discount_code:null,partner_name:null,product_cost:productCost,gross_profit:discounted-productCost}); localSave();
+        state.data.orders.unshift({order_no:`MAN-${Date.now()}`,created_at:payload.orderDate,customer_name:payload.customer.name,customer_phone:payload.customer.phone,customer_email:payload.customer.email,items:orderItems,product_amount:productAmount,discount_amount:payload.discountAmount,shipping_fee:shippingFee,order_amount:discounted+shippingFee,shipping_method:payload.shipping.method,shipping_details:payload.shipping.details,transfer_last_five:'',transfer_time:null,note:payload.note,payment_method:payload.paymentMethod,payment_status:payload.paymentStatus,shipping_status:payload.shippingStatus,trade_no:'',discount_code:null,partner_name:null,product_cost:productCost,gross_profit:discounted-productCost}); localSave();
       }else{
         const response=await fetch('/.netlify/functions/admin-order-create',{method:'POST',headers:{'Content-Type':'application/json',Authorization:`Bearer ${state.token}`},body:JSON.stringify(payload)}); const result=await response.json(); if(!response.ok)throw new Error(result.error||'手動訂單建立失敗');
       }
@@ -409,7 +421,7 @@ document.addEventListener('click', async event => {
 });
 
 $('#chooseOrderColumns').addEventListener('click',()=>$('#orderColumnPicker').classList.toggle('hidden'));
-$('#orderReportMonth').addEventListener('change',renderOrderSummary);
+$('#orderReportMonth').addEventListener('change',renderOrders);
 $('#orderColumnPicker').addEventListener('change',()=>{const values=[...$('#orderColumnPicker').querySelectorAll(':checked')].map(i=>i.value);if(!values.length)return toast('至少保留一個欄位');localStorage.setItem(ORDER_COLUMN_KEY,JSON.stringify(values));renderOrders();});
 $('#orderRows').addEventListener('change',async event=>{if(!event.target.matches('.order-status'))return;const order=state.data.orders.find(o=>o.order_no===event.target.dataset.order);if(!order)return;const body={orderNo:order.order_no,paymentStatus:event.target.dataset.kind==='payment'?event.target.value:order.payment_status,shippingStatus:event.target.dataset.kind==='shipping'?event.target.value:order.shipping_status};setSaving(true);try{const response=await fetch('/.netlify/functions/order-status-sync',{method:'POST',headers:{'Content-Type':'application/json',Authorization:`Bearer ${state.token}`},body:JSON.stringify(body)});const text=await response.text();let result={};try{result=text?JSON.parse(text):{};}catch{result={error:text};}if(!response.ok)throw new Error(result.error||'狀態更新失敗');state.data=await cloudLoad();renderOrders();toast('訂單與試算表已同步');}catch(error){renderOrders();toast(error.message||'狀態更新失敗');}finally{setSaving(false);}});
 
