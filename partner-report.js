@@ -21,8 +21,9 @@ function showError() {
 function showReport(report) {
   document.querySelector('#error').classList.add('hidden');
   document.querySelector('#report').classList.remove('hidden');
+  document.querySelector('#uses').previousElementSibling.textContent = '團購訂單數';
   document.querySelector('#campaignName').textContent = `${report.campaign_name}｜團購月報表`;
-  document.querySelector('#partnerName').textContent = `團主：${report.partner_name}　專屬折扣碼：${report.discount_code}　佣金：${report.commission_rate}%`;
+  document.querySelector('#partnerName').textContent = `團主：${report.partner_name}　${report.discount_code ? `專屬折扣碼：${report.discount_code}　` : ''}佣金：${report.commission_rate}%`;
   document.querySelector('#uses').textContent = report.uses;
   document.querySelector('#paid').textContent = report.paid_orders;
   document.querySelector('#revenue').textContent = money(report.net_product_amount);
@@ -45,12 +46,12 @@ function renderLocal() {
   const data = JSON.parse(localStorage.getItem('ibuy-admin-data-v1') || '{}');
   const campaign = (data.campaigns || []).find(item => item.report_token === token && item.enabled);
   if (!campaign) return showError();
-  const orders = (data.orders || []).filter(order => order.discount_code === campaign.discount_code && new Date(order.created_at).getFullYear() === Number(year.value) && new Date(order.created_at).getMonth() + 1 === Number(month.value));
+  const orders = (data.orders || []).filter(order => (order.shipping_details?.campaign_id === campaign.id || (!order.shipping_details?.campaign_id && campaign.discount_code && order.discount_code === campaign.discount_code)) && new Date(order.created_at).getFullYear() === Number(year.value) && new Date(order.created_at).getMonth() + 1 === Number(month.value));
   const paid = orders.filter(order => order.payment_status === '已付款' && !['已取消', '已退款'].includes(order.order_status));
   const productAmount = paid.reduce((sum, order) => sum + Number(order.product_amount || 0), 0);
   const discountAmount = paid.reduce((sum, order) => sum + Number(order.discount_amount || 0), 0);
   const netAmount = productAmount - discountAmount;
-  showReport({ campaign_name: campaign.name, partner_name: campaign.partner_name, discount_code: campaign.discount_code, commission_rate: campaign.commission_rate, uses: orders.length, paid_orders: paid.length, cancelled_orders: orders.length - paid.length, product_amount: productAmount, discount_amount: discountAmount, net_product_amount: netAmount, commission_amount: Math.round(netAmount * Number(campaign.commission_rate || 0) / 100) });
+  showReport({ campaign_name: campaign.name, partner_name: campaign.partner_name, discount_code: campaign.discount_code, commission_rate: campaign.commission_rate, uses: orders.length, paid_orders: paid.length, pending_orders: orders.length - paid.length, product_amount: productAmount, discount_amount: discountAmount, net_product_amount: netAmount, commission_amount: Math.round(netAmount * Number(campaign.commission_rate || 0) / 100) });
   document.querySelector('#localNote').classList.toggle('hidden', Boolean(data.orders?.length));
 }
 
