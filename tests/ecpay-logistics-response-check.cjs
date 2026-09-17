@@ -20,19 +20,27 @@ const order = {
   items: [{ name: '原味#肉乾' }], customer_name: '王小明', customer_phone: '0912345678', customer_email: 'test@example.com'
 };
 let sent;
+let createSucceeds = false;
+let saved;
 global.fetch = async (url, options) => {
   if (url.endsWith('/auth/v1/user')) return { ok: true, json: async () => ({ id: 'admin-id' }) };
   if (url.includes('/rest/v1/admin_users?')) return { ok: true, text: async () => JSON.stringify([{ user_id: 'admin-id' }]) };
   if (url.includes('/rest/v1/orders?') && !options?.method) return { ok: true, text: async () => JSON.stringify([order]) };
   if (url.includes('/Express/Create')) {
     sent = Object.fromEntries(options.body);
-    return { ok: true, text: async () => '0|10500000 Test rejection' };
+    return { ok: true, text: async () => createSucceeds
+      ? '1|RtnCode=300&RtnMsg=OK&AllPayLogisticsID=987654321&CVSPaymentNo=123456789&CVSValidationNo=2468'
+      : '0|10500000 Test rejection' };
+  }
+  if (url.includes('/rest/v1/orders?') && options?.method === 'PATCH') {
+    saved = JSON.parse(options.body);
+    return { ok: true, text: async () => JSON.stringify([{ ...order, ...saved }]) };
   }
   throw new Error(`Unexpected request: ${url}`);
 };
 
 handler({ httpMethod: 'POST', headers: { authorization: 'Bearer test-jwt' }, body: JSON.stringify({ orderNo: order.order_no }) })
-  .then(response => {
+  .then(async response => {
     assert.equal(response.statusCode, 400);
     assert.match(JSON.parse(response.body).error, /10500000 Test rejection/);
     assert.equal(sent.LogisticsSubType, 'UNIMARTC2C');
@@ -40,6 +48,13 @@ handler({ httpMethod: 'POST', headers: { authorization: 'Bearer test-jwt' }, bod
     assert.equal(sent.CollectionAmount, sent.GoodsAmount);
     assert.equal(sent.IsCollection, 'N');
     assert.equal(sent.GoodsName, '原味 肉乾');
+    createSucceeds = true;
+    const success = await handler({ httpMethod: 'POST', headers: { authorization: 'Bearer test-jwt' }, body: JSON.stringify({ orderNo: order.order_no }) });
+    assert.equal(success.statusCode, 200);
+    assert.equal(saved.logistics_trade_no, '987654321');
+    assert.equal(saved.shipping_details.store711Id, '123456');
+    assert.equal(saved.shipping_details.ecpay_cvs_payment_no, '123456789');
+    assert.equal(saved.shipping_details.ecpay_cvs_validation_no, '2468');
     console.log('ECPay logistics response checks passed.');
   })
   .catch(error => { console.error(error); process.exitCode = 1; });
