@@ -1,5 +1,6 @@
 const { supabase } = require('./_orders');
 const { checkMacValue, requireAdmin } = require('./_ecpay');
+const { logisticsNumbers } = require('./_ecpay-logistics-number');
 const json = (statusCode, body) => ({ statusCode, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
 const clean = (value, max) => String(value || '').replace(/[&<>]/g, '').slice(0, max);
 const pad = value => String(value).padStart(2, '0');
@@ -75,7 +76,7 @@ exports.handler = async event => {
     const text = await response.text();
     if (!response.ok) throw new Error(`綠界物流建單失敗 (${response.status})，請先到綠界後台確認是否已建單`);
     const result = parseCreateResponse(text);
-    const updated = await supabase(`orders?order_no=eq.${encodeURIComponent(order.order_no)}`, { method: 'PATCH', headers: { Prefer: 'return=representation' }, body: JSON.stringify({ logistics_trade_no: result.AllPayLogisticsID, logistics_status: result.RtnCode, logistics_message: result.RtnMsg || '', logistics_created_at: new Date().toISOString() }) });
+    const updated = await supabase(`orders?order_no=eq.${encodeURIComponent(order.order_no)}`, { method: 'PATCH', headers: { Prefer: 'return=representation' }, body: JSON.stringify({ logistics_trade_no: result.AllPayLogisticsID, logistics_status: result.RtnCode, logistics_message: result.RtnMsg || '', logistics_created_at: new Date().toISOString(), shipping_details: { ...details, ...logisticsNumbers(result) } }) });
     return json(200, updated[0]);
   } catch (error) { return json(error.statusCode || 400, { error: error.message }); }
 };

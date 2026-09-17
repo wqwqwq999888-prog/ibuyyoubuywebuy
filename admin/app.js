@@ -211,12 +211,22 @@ function shippingDetailsText(order) {
   return [details.city||'',details.address||''].filter(Boolean).join(' ') || '—';
 }
 function canCreateLogistics(order) { return order.shipping_method !== 'meetup' && ['已付款','已匯款待確認'].includes(order.payment_status) && !order.logistics_trade_no; }
+function logisticsPrintNumber(order) {
+  const details = order.shipping_details || {};
+  if (order.shipping_method === '711') return `${details.ecpay_cvs_payment_no || ''}${details.ecpay_cvs_validation_no || ''}`;
+  if (order.shipping_method === 'family') return details.ecpay_cvs_payment_no || '';
+  if (order.shipping_method === 'kuroneko') return details.ecpay_booking_note || '';
+  return '';
+}
 function orderCell(order, key) {
   if (key === 'payment_status') return `<select class="order-status" data-kind="payment" data-order="${escapeHtml(order.order_no)}">${['待付款','已付款','已匯款待確認','付款失敗'].map(s=>`<option ${s===order[key]?'selected':''}>${s}</option>`).join('')}</select>`;
   if (key === 'shipping_status') return `<select class="order-status" data-kind="shipping" data-order="${escapeHtml(order.order_no)}">${['待出貨','已出貨','已完成'].map(s=>`<option ${s===order[key]?'selected':''}>${s}</option>`).join('')}</select>`;
   if (key === 'items') return escapeHtml((order.items||[]).map(i=>`${i.name} × ${i.qty}`).join('、'));
   if (key === 'shipping_method') return escapeHtml(shippingMethodText(order[key]));
-  if (key === 'shipping_details') return `${escapeHtml(shippingDetailsText(order))}${canCreateLogistics(order)?`<br><button class="row-button" data-create-logistics="${escapeHtml(order.order_no)}">建立綠界物流單</button>`:order.logistics_trade_no?`<div class="cell-sub">物流單號：${escapeHtml(order.logistics_trade_no)}／${escapeHtml(order.logistics_message||order.logistics_status||'已建立')}</div>`:''}`;
+  if (key === 'shipping_details') {
+    const printNumber = logisticsPrintNumber(order);
+    return `${escapeHtml(shippingDetailsText(order))}${canCreateLogistics(order)?`<br><button class="row-button" data-create-logistics="${escapeHtml(order.order_no)}">建立綠界物流單</button>`:order.logistics_trade_no?`<div class="cell-sub">${order.shipping_method==='kuroneko'?'託運單號':'寄件／列印編號'}：${printNumber?`<strong>${escapeHtml(printNumber)}</strong>`:`<button class="row-button" data-query-logistics="${escapeHtml(order.order_no)}">查詢寄件編號</button>`}</div><div class="cell-sub">綠界物流交易號：${escapeHtml(order.logistics_trade_no)}／${escapeHtml(order.logistics_message||order.logistics_status||'已建立')}</div>`:''}`;
+  }
   if (key === 'customer_phone') { const details=order.shipping_details||{}; return escapeHtml(details.contact_value ? `${({line:'LINE',facebook:'Facebook',instagram:'Instagram',phone:'手機'})[details.contact_type]||'聯繫'}：${details.contact_value}` : order.customer_phone || '—'); }
   if (key === 'commission_amount') return money(AdminOrderFinance.orderFinance(order, state.data.campaigns).commission);
   if (key === 'gross_profit') return money(AdminOrderFinance.orderFinance(order, state.data.campaigns).profitAfterCommission);
@@ -416,6 +426,8 @@ document.addEventListener('click', async event => {
   const copy = event.target.closest('[data-copy]'); if(copy){try{await navigator.clipboard.writeText(copy.dataset.copy);toast('專屬連結已複製');}catch{window.prompt('請複製這個專屬連結：',copy.dataset.copy);} }
   const logistics = event.target.closest('[data-create-logistics]');
   if(logistics && confirm('確定要建立綠界物流單嗎？')){setSaving(true);try{const response=await fetch('/.netlify/functions/ecpay-logistics-create',{method:'POST',headers:{'Content-Type':'application/json',Authorization:`Bearer ${state.token}`},body:JSON.stringify({orderNo:logistics.dataset.createLogistics})});const result=await response.json();if(!response.ok)throw new Error(result.error||'物流建單失敗');state.data=await cloudLoad();renderOrders();toast('綠界物流單已建立');}catch(error){toast(error.message||'物流建單失敗');}finally{setSaving(false);}return;}
+  const queryLogistics = event.target.closest('[data-query-logistics]');
+  if(queryLogistics){setSaving(true);try{const response=await fetch('/.netlify/functions/ecpay-logistics-query',{method:'POST',headers:{'Content-Type':'application/json',Authorization:`Bearer ${state.token}`},body:JSON.stringify({orderNo:queryLogistics.dataset.queryLogistics})});const result=await response.json();if(!response.ok)throw new Error(result.error||'查詢寄件編號失敗');state.data=await cloudLoad();renderOrders();toast('寄件編號已更新');}catch(error){toast(error.message||'查詢寄件編號失敗');}finally{setSaving(false);}return;}
   const deleteOrder = event.target.closest('[data-delete-order]');
   if(deleteOrder){const order=state.data.orders.find(item=>item.order_no===deleteOrder.dataset.deleteOrder);if(order)openDeleteOrder(order);return;}
 });
