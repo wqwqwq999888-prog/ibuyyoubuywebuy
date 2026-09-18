@@ -1,5 +1,6 @@
 const assert = require('assert');
 const fs = require('fs');
+const vm = require('vm');
 const { purchasePayload, sendPurchase } = require('../netlify/functions/_analytics');
 
 const home = fs.readFileSync('index.html', 'utf8');
@@ -22,7 +23,35 @@ for (const html of [home, checkout, vote]) {
 for (const event of ['view_item', 'add_to_cart', 'begin_checkout']) assert(home.includes(`'${event}'`), `${event} is not instrumented`);
 assert(browserAnalytics.includes("send_page_view: true"));
 assert(browserAnalytics.includes("track('select_content'"));
+assert(browserAnalytics.includes("track('purchase'"));
+assert(browserAnalytics.includes("const PURCHASED_ORDERS_KEY = 'ibuy-ga4-purchased-orders-v1'"));
+assert.match(checkout, /orderData\.orderId = result\.orderId;[\s\S]*IBuyAnalytics\.trackPurchase\(orderData\);[\s\S]*showSuccess\(orderData\);/);
 assert(browserAnalytics.includes("'utm_source', 'utm_medium', 'utm_campaign', 'utm_term', 'utm_content', 'campaign'"));
+
+const storage = () => {
+  const values = new Map();
+  return { getItem: key => values.get(key) || null, setItem: (key, value) => values.set(key, String(value)) };
+};
+const browserEvents = [];
+const browserContext = {
+  URLSearchParams, location: { search: '' }, sessionStorage: storage(), localStorage: storage(),
+  document: { cookie: '', addEventListener() {} }
+};
+browserContext.window = browserContext;
+browserContext.gtag = (...args) => browserEvents.push(args);
+vm.runInNewContext(browserAnalytics, browserContext);
+const browserOrder = {
+  orderId: 'DZM123', productAmount: 600, discountAmount: 100, shippingFee: 70,
+  discountCode: 'SAVE100', items: [{ productNo: 100001, name: '經典蜜汁', price: 200, qty: 3 }]
+};
+assert.strictEqual(browserContext.IBuyAnalytics.trackPurchase(browserOrder), true);
+assert.strictEqual(browserContext.IBuyAnalytics.trackPurchase(browserOrder), false);
+const purchaseEvents = browserEvents.filter(args => args[0] === 'event' && args[1] === 'purchase');
+assert.strictEqual(purchaseEvents.length, 1, 'the same order must only emit one browser purchase');
+assert.deepStrictEqual(JSON.parse(JSON.stringify(purchaseEvents[0][2])), {
+  transaction_id: 'DZM123', value: 500, currency: 'TWD', shipping: 70, coupon: 'SAVE100',
+  items: [{ item_id: '100001', item_name: '經典蜜汁', price: 200, quantity: 3 }]
+});
 assert.strictEqual((home.match(/G-FRZ2RMV82S/g) || []).length, 1);
 assert.strictEqual((checkout.match(/G-FRZ2RMV82S/g) || []).length, 1);
 assert(orderHelpers.includes('analytics: data.analytics || null'), 'order attribution is not retained for purchase tracking');

@@ -4,6 +4,7 @@
   const MEASUREMENT_ID = 'G-FRZ2RMV82S';
   const ATTRIBUTION_KEY = 'ibuy-ga4-attribution-v1';
   const CAMPAIGN_KEY = 'ibuy-campaign-context';
+  const PURCHASED_ORDERS_KEY = 'ibuy-ga4-purchased-orders-v1';
   const ATTRIBUTION_PARAMS = ['utm_source', 'utm_medium', 'utm_campaign', 'utm_term', 'utm_content', 'campaign'];
 
   window.dataLayer = window.dataLayer || [];
@@ -66,6 +67,35 @@
     return { client_id: clientId(), session_id: sessionId(), ...attribution() };
   }
 
+  function trackPurchase(order) {
+    const transactionId = String(order?.orderId || '');
+    if (!transactionId) return false;
+
+    const trackedOrders = readJson(localStorage, PURCHASED_ORDERS_KEY);
+    const transactionIds = Array.isArray(trackedOrders) ? trackedOrders : [];
+    if (transactionIds.includes(transactionId)) return false;
+
+    const items = (order.items || []).map(item => ({
+      item_id: String(item.productNo),
+      item_name: String(item.name),
+      price: Number(item.price),
+      quantity: Number(item.qty)
+    }));
+    track('purchase', {
+      transaction_id: transactionId,
+      value: Math.max(0, Number(order.productAmount ?? order.subtotal) - Number(order.discountAmount || 0)),
+      currency: 'TWD',
+      shipping: Number(order.shippingFee || 0),
+      coupon: order.discountCode || undefined,
+      items
+    });
+
+    try {
+      localStorage.setItem(PURCHASED_ORDERS_KEY, JSON.stringify([...transactionIds, transactionId].slice(-50)));
+    } catch (_) {}
+    return true;
+  }
+
   document.addEventListener('click', event => {
     const target = event.target.closest('a, button');
     if (!target) return;
@@ -73,5 +103,5 @@
     if (label) track('select_content', { content_type: 'cta', content_id: label });
   });
 
-  window.IBuyAnalytics = { attribution, orderAttribution, productReference, track };
+  window.IBuyAnalytics = { attribution, orderAttribution, productReference, track, trackPurchase };
 })();
