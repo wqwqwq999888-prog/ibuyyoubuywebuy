@@ -3,7 +3,49 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>鬥陣買肉乾 — I BUY. YOU BUY. WE BUY.</title>
+<title>鬥陣買肉乾｜台中伴手禮推薦・肉乾禮盒・團購送禮</title>
+<meta name="description" content="鬥陣買是台中肉乾品牌，主打獨立真空包裝條狀肉乾，好吃不沾手、方便分享。提供多種口味、肉乾禮盒與團購選擇，適合日常零食、家庭分享與節慶送禮。">
+<link rel="canonical" href="https://douzhenmai.com/">
+<meta property="og:title" content="鬥陣買肉乾｜好吃不沾手，大家鬥陣吃">
+<meta property="og:description" content="獨立真空包裝條狀肉乾，多種口味任你挑。自己吃、家庭分享、公司團購、節慶送禮，隨時隨地都能鬥陣吃。">
+<meta property="og:image" content="https://douzhenmai.com/og-image.jpg">
+<meta property="og:image:alt" content="鬥陣買肉乾品牌包裝">
+<meta property="og:image:width" content="800">
+<meta property="og:image:height" content="533">
+<meta property="og:url" content="https://douzhenmai.com/">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="鬥陣買">
+<meta property="og:locale" content="zh_TW">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="鬥陣買肉乾｜好吃不沾手，大家鬥陣吃">
+<meta name="twitter:description" content="獨立真空包裝條狀肉乾，多種口味任你挑。自己吃、家庭分享、公司團購、節慶送禮，隨時隨地都能鬥陣吃。">
+<meta name="twitter:image" content="https://douzhenmai.com/og-image.jpg">
+<meta name="twitter:image:alt" content="鬥陣買肉乾品牌包裝">
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-FRZ2RMV82S"></script>
+<script src="analytics.js"></script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "Organization",
+      "@id": "https://douzhenmai.com/#organization",
+      "name": "鬥陣買",
+      "url": "https://douzhenmai.com/"
+    },
+    {
+      "@type": "WebSite",
+      "@id": "https://douzhenmai.com/#website",
+      "url": "https://douzhenmai.com/",
+      "name": "鬥陣買",
+      "publisher": {
+        "@id": "https://douzhenmai.com/#organization"
+      },
+      "inLanguage": "zh-TW"
+    }
+  ]
+}
+</script>
 <style>
 :root {
   --gold: #C9A84C;
@@ -543,13 +585,13 @@ footer {
     </h1>
     <p class="hero-sub">嚴選台灣後腿豬肉，八種風味一次滿足。<br>從國民口味到私藏限定，每一顆肉蕾都值得。</p>
     <div class="hero-cta-group">
-      <button class="hero-cta" onclick="document.getElementById('products').scrollIntoView({behavior:'smooth'})">
+      <button class="hero-cta" data-analytics-label="hero-products" onclick="document.getElementById('products').scrollIntoView({behavior:'smooth'})">
         單一口味選購
         <svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="2">
           <path d="M3 9h12M9 3l6 6-6 6"/>
         </svg>
       </button>
-      <button class="hero-cta-outline" onclick="document.getElementById('combo').scrollIntoView({behavior:'smooth'})">
+      <button class="hero-cta-outline" data-analytics-label="hero-combos" onclick="document.getElementById('combo').scrollIntoView({behavior:'smooth'})">
         送禮組合選購
         <svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="2">
           <path d="M3 9h12M9 3l6 6-6 6"/>
@@ -852,6 +894,8 @@ function renderCombo(idx, btn) {
   if (btn) {
     document.querySelectorAll('.combo-tab').forEach(t => t.classList.remove('active'));
     btn.classList.add('active');
+    const viewed = COMBOS[idx];
+    IBuyAnalytics.track('view_item', { items: [IBuyAnalytics.productReference(viewed)] });
   }
   const c = COMBOS[idx];
   const flavorList = c.flavors.map(flavor => typeof flavor === 'number' ? FLAVORS[flavor]?.name : flavor).filter(Boolean).join('、');
@@ -907,6 +951,7 @@ let modalIdx = 0;
 function openModal(idx) {
   modalIdx = idx; modalQty = 1;
   const f = FLAVORS[idx];
+  IBuyAnalytics.track('view_item', { items: [IBuyAnalytics.productReference(f)] });
   const m = document.getElementById('modalContent');
   const details = f.description
     ? `<p style="white-space:pre-line">${escapeStorefront(f.description)}</p>`
@@ -951,6 +996,7 @@ function addToCart(idx, qty) {
   qty = parseInt(qty) || 1;
   const key = FLAVORS[idx].product_no;
   cart[key] = (cart[key] || 0) + qty;
+  IBuyAnalytics.track('add_to_cart', { items: [IBuyAnalytics.productReference(FLAVORS[idx])] });
   updateCart();
   showToast(`已加入 ${FLAVORS[idx].name} × ${qty}`);
 }
@@ -960,6 +1006,7 @@ function addComboToCart(idx) {
   const c = COMBOS[idx];
   const cartKey = c.product_no;
   cart[cartKey] = (cart[cartKey] || 0) + 1;
+  IBuyAnalytics.track('add_to_cart', { items: [IBuyAnalytics.productReference(c)] });
   updateCart();
   showToast(`已加入「${c.name}」組合`);
   toggleCart();
@@ -1027,6 +1074,7 @@ function toggleCart() {
 }
 
 function goCheckout() {
+  IBuyAnalytics.track('begin_checkout');
   sessionStorage.setItem('cart', JSON.stringify(cart));
   window.location.href = 'checkout.html';
 }
