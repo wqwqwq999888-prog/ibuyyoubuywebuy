@@ -23,6 +23,7 @@ function purchasePayload(order) {
     term: analytics.utm_term || undefined,
     content: analytics.utm_content || undefined,
     engagement_time_msec: 1,
+    debug_mode: analytics.debug_mode === true || undefined,
     items: (order.items || []).map(item => ({
       item_id: String(item.productNo),
       item_name: String(item.name),
@@ -40,7 +41,10 @@ function purchasePayload(order) {
 
 async function sendPurchase(order) {
   const apiSecret = process.env.GA4_API_SECRET;
-  if (!apiSecret) return { skipped: true };
+  if (!apiSecret) {
+    console.error(`GA4 purchase tracking skipped for ${order.order_no}: GA4_API_SECRET is not configured`);
+    return { skipped: true, reason: 'missing_api_secret' };
+  }
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 2000);
   try {

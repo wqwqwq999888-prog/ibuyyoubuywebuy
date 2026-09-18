@@ -4,6 +4,8 @@
   const MEASUREMENT_ID = 'G-FRZ2RMV82S';
   const ATTRIBUTION_KEY = 'ibuy-ga4-attribution-v1';
   const CAMPAIGN_KEY = 'ibuy-campaign-context';
+  const PURCHASED_ORDERS_KEY = 'ibuy-ga4-purchased-orders-v1';
+  const DEBUG_MODE_KEY = 'ibuy-ga4-debug-mode';
   const ATTRIBUTION_PARAMS = ['utm_source', 'utm_medium', 'utm_campaign', 'utm_term', 'utm_content', 'campaign'];
 
   window.dataLayer = window.dataLayer || [];
@@ -16,7 +18,20 @@
     catch (_) { return null; }
   }
 
+  function debugMode() {
+    const params = new URLSearchParams(location.search);
+    const hashParams = new URLSearchParams(String(location.hash || '').replace(/^#.*\?/, ''));
+    const current = params.has('gtm_debug') || params.get('debug_mode') === '1' ||
+      hashParams.has('gtm_debug') || hashParams.get('debug_mode') === '1';
+    if (current) {
+      try { sessionStorage.setItem(DEBUG_MODE_KEY, '1'); } catch (_) {}
+    }
+    try { return current || sessionStorage.getItem(DEBUG_MODE_KEY) === '1'; }
+    catch (_) { return current; }
+  }
+
   function attribution() {
+    debugMode();
     const params = new URLSearchParams(location.search);
     const current = {};
     ATTRIBUTION_PARAMS.forEach(key => {
@@ -28,6 +43,7 @@
     if (campaign?.name) current.campaign_name = campaign.name;
     if (campaign?.partner_name) current.campaign_partner = campaign.partner_name;
     const saved = readJson(sessionStorage, ATTRIBUTION_KEY) || {};
+    if (debugMode()) current.debug_mode = true;
     const merged = { ...saved, ...current };
     try { sessionStorage.setItem(ATTRIBUTION_KEY, JSON.stringify(merged)); } catch (_) {}
     return merged;
@@ -63,7 +79,46 @@
   }
 
   function orderAttribution() {
-    return { client_id: clientId(), session_id: sessionId(), ...attribution() };
+    return { client_id: clientId(), session_id: sessionId(), debug_mode: debugMode() || undefined, ...attribution() };
+  }
+
+  function trackPurchase(order) {
+    const transactionId = String(order?.orderId || '');
+    if (!transactionId) return false;
+
+    const trackedOrders = readJson(localStorage, PURCHASED_ORDERS_KEY);
+    const transactionIds = Array.isArray(trackedOrders) ? trackedOrders : [];
+    if (transactionIds.includes(transactionId)) return false;
+
+    const items = (order.items || []).map(item => ({
+      item_id: String(item.productNo),
+      item_name: String(item.name),
+      price: Number(item.price),
+      quantity: Number(item.qty)
+    }));
+    track('purchase', {
+      transaction_id: transactionId,
+      value: Math.max(0, Number(order.productAmount ?? order.subtotal) - Number(order.discountAmount || 0)),
+      currency: 'TWD',
+      shipping: Number(order.shippingFee || 0),
+      coupon: order.discountCode || undefined,
+      items
+    });
+
+    try {
+      localStorage.setItem(PURCHASED_ORDERS_KEY, JSON.stringify([...transactionIds, transactionId].slice(-50)));
+    } catch (_) {}
+    console.info(`GA4 purchase queued for ${transactionId}`);
+    return true;
+  }
+
+  function diagnostics() {
+    return {
+      measurement_id: MEASUREMENT_ID,
+      debug_mode: debugMode(),
+      attribution: readJson(sessionStorage, ATTRIBUTION_KEY) || {},
+      purchased_transaction_ids: readJson(localStorage, PURCHASED_ORDERS_KEY) || []
+    };
   }
 
   document.addEventListener('click', event => {
@@ -73,5 +128,6 @@
     if (label) track('select_content', { content_type: 'cta', content_id: label });
   });
 
-  window.IBuyAnalytics = { attribution, orderAttribution, productReference, track };
+  attribution();
+  window.IBuyAnalytics = { attribution, orderAttribution, productReference, track, trackPurchase, diagnostics };
 })();

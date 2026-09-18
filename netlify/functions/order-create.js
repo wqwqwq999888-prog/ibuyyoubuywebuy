@@ -1,4 +1,5 @@
 const { supabase, normalizeOrder, validateProductPricing, addProductCosts, syncSheet, campaignIdFromCookie } = require('./_orders');
+const { sendPurchase } = require('./_analytics');
 
 exports.handler = async event => {
   if (event.httpMethod !== 'POST') return { statusCode: 405, body: 'Method Not Allowed' };
@@ -9,9 +10,10 @@ exports.handler = async event => {
     const order = await addProductCosts(pricedOrder);
     if (!/^\d{5}$/.test(order.transfer_last_five)) throw new Error('請填寫轉帳後五碼');
     const existing = await supabase(`orders?order_no=eq.${encodeURIComponent(order.order_no)}&select=*`);
-    const savedOrder = existing[0] || (await supabase('orders', {
+    const created = existing.length ? [] : await supabase('orders', {
       method: 'POST', headers: { Prefer: 'return=representation' }, body: JSON.stringify(order)
-    }))[0];
+    });
+    const savedOrder = existing[0] || created[0];
     let sheetSynced = true;
     try {
       await syncSheet(savedOrder);
@@ -19,6 +21,7 @@ exports.handler = async event => {
       sheetSynced = false;
       console.error('Order saved, but Google Sheet sync failed', error);
     }
+    if (created.length) await sendPurchase(savedOrder);
     return {
       statusCode: existing[0] ? 200 : 201,
       headers: { 'Content-Type': 'application/json' },

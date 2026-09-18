@@ -1,5 +1,6 @@
 const assert = require('assert');
 const fs = require('fs');
+const vm = require('vm');
 const { purchasePayload, sendPurchase } = require('../netlify/functions/_analytics');
 
 const home = fs.readFileSync('index.html', 'utf8');
@@ -7,6 +8,7 @@ const checkout = fs.readFileSync('checkout.html', 'utf8');
 const vote = fs.readFileSync('vote.html', 'utf8');
 const browserAnalytics = fs.readFileSync('analytics.js', 'utf8');
 const orderHelpers = fs.readFileSync('netlify/functions/_orders.js', 'utf8');
+const orderCreate = fs.readFileSync('netlify/functions/order-create.js', 'utf8');
 const ecpayReturn = fs.readFileSync('netlify/functions/ecpay-return.js', 'utf8');
 const statusSync = fs.readFileSync('netlify/functions/order-status-sync.js', 'utf8');
 
@@ -17,17 +19,56 @@ for (const property of ['og:description', 'twitter:description']) assert(home.in
 
 for (const html of [home, checkout, vote]) {
   assert.match(html, /googletagmanager\.com\/gtag\/js\?id=G-FRZ2RMV82S/);
-  assert.match(html, /<script src="analytics\.js"><\/script>/);
+  assert.match(html, /<script src="analytics\.js\?v=20260918-1"><\/script>/);
 }
+assert.match(fs.readFileSync('netlify.toml', 'utf8'), /for = "\/analytics\.js"[\s\S]*Cache-Control = "no-cache, no-store, must-revalidate"/);
 for (const event of ['view_item', 'add_to_cart', 'begin_checkout']) assert(home.includes(`'${event}'`), `${event} is not instrumented`);
 assert(browserAnalytics.includes("send_page_view: true"));
 assert(browserAnalytics.includes("track('select_content'"));
+assert(browserAnalytics.includes("track('purchase'"));
+assert(browserAnalytics.includes("const PURCHASED_ORDERS_KEY = 'ibuy-ga4-purchased-orders-v1'"));
+assert.match(checkout, /orderData\.orderId = result\.orderId;[\s\S]*showSuccess\(orderData\);/);
+assert(!checkout.includes('IBuyAnalytics.trackPurchase(orderData)'), 'bank purchase must have one canonical server-side sender');
 assert(browserAnalytics.includes("'utm_source', 'utm_medium', 'utm_campaign', 'utm_term', 'utm_content', 'campaign'"));
+
+const storage = () => {
+  const values = new Map();
+  return { getItem: key => values.get(key) || null, setItem: (key, value) => values.set(key, String(value)) };
+};
+const browserEvents = [];
+const browserContext = {
+  URLSearchParams, location: { search: '', hash: '' }, sessionStorage: storage(), localStorage: storage(),
+  document: { cookie: '', addEventListener() {} }, console: { info() {} }
+};
+browserContext.window = browserContext;
+browserContext.gtag = (...args) => browserEvents.push(args);
+vm.runInNewContext(browserAnalytics, browserContext);
+browserContext.location.search = '?gtm_debug=test';
+assert.strictEqual(browserContext.IBuyAnalytics.orderAttribution().debug_mode, true);
+assert.deepStrictEqual(JSON.parse(browserContext.sessionStorage.getItem('ibuy-ga4-attribution-v1')), { debug_mode: true });
+browserContext.location.search = '';
+assert.strictEqual(browserContext.IBuyAnalytics.orderAttribution().debug_mode, true, 'debug mode must survive checkout navigation');
+assert.deepStrictEqual(JSON.parse(JSON.stringify(browserContext.IBuyAnalytics.diagnostics())), {
+  measurement_id: 'G-FRZ2RMV82S', debug_mode: true, attribution: { debug_mode: true }, purchased_transaction_ids: []
+});
+const browserOrder = {
+  orderId: 'DZM123', productAmount: 600, discountAmount: 100, shippingFee: 70,
+  discountCode: 'SAVE100', items: [{ productNo: 100001, name: '經典蜜汁', price: 200, qty: 3 }]
+};
+assert.strictEqual(browserContext.IBuyAnalytics.trackPurchase(browserOrder), true);
+assert.strictEqual(browserContext.IBuyAnalytics.trackPurchase(browserOrder), false);
+const purchaseEvents = browserEvents.filter(args => args[0] === 'event' && args[1] === 'purchase');
+assert.strictEqual(purchaseEvents.length, 1, 'the same order must only emit one browser purchase');
+assert.deepStrictEqual(JSON.parse(JSON.stringify(purchaseEvents[0][2])), {
+  debug_mode: true, transaction_id: 'DZM123', value: 500, currency: 'TWD', shipping: 70, coupon: 'SAVE100',
+  items: [{ item_id: '100001', item_name: '經典蜜汁', price: 200, quantity: 3 }]
+});
 assert.strictEqual((home.match(/G-FRZ2RMV82S/g) || []).length, 1);
 assert.strictEqual((checkout.match(/G-FRZ2RMV82S/g) || []).length, 1);
 assert(orderHelpers.includes('analytics: data.analytics || null'), 'order attribution is not retained for purchase tracking');
 assert.match(ecpayReturn, /if \(created\.length\) \{[\s\S]*await syncSheet\(created\[0\]\);[\s\S]*await sendPurchase\(created\[0\]\);[\s\S]*\}/);
-assert.match(statusSync, /existing\[0\]\.payment_status !== '已付款' && paymentStatus === '已付款' && rows\[0\]\.shipping_details\?\.analytics/);
+assert.match(orderCreate, /if \(created\.length\) await sendPurchase\(savedOrder\);/);
+assert(!statusSync.includes('sendPurchase'), 'admin payment-status changes must not duplicate purchase tracking');
 
 const order = {
   order_no: 'D123', order_amount: 570, product_amount: 600, discount_amount: 100, shipping_fee: 70,
@@ -42,6 +83,9 @@ const payload = purchasePayload(order);
 assert.strictEqual(payload.client_id, '123.456');
 assert.strictEqual(payload.events[0].name, 'purchase');
 assert.deepStrictEqual(payload.events[0].params.items[0], { item_id: '100001', item_name: '經典蜜汁', price: 200, quantity: 3 });
+assert.strictEqual(payload.events[0].params.debug_mode, undefined);
+const debugPayload = purchasePayload({ ...order, shipping_details: { analytics: { ...order.shipping_details.analytics, debug_mode: true } } });
+assert.strictEqual(debugPayload.events[0].params.debug_mode, true);
 assert.deepStrictEqual({
   transaction_id: payload.events[0].params.transaction_id,
   currency: payload.events[0].params.currency,
@@ -67,7 +111,7 @@ for (const internal of ['product_cost', 'gross_profit', 'commission_amount']) {
   const oldSecret = process.env.GA4_API_SECRET;
   const oldFetch = global.fetch;
   delete process.env.GA4_API_SECRET;
-  assert.deepStrictEqual(await sendPurchase(order), { skipped: true });
+  assert.deepStrictEqual(await sendPurchase(order), { skipped: true, reason: 'missing_api_secret' });
 
   let request;
   process.env.GA4_API_SECRET = 'test-secret';
