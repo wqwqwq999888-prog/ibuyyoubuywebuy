@@ -8,6 +8,7 @@ const checkout = fs.readFileSync('checkout.html', 'utf8');
 const vote = fs.readFileSync('vote.html', 'utf8');
 const browserAnalytics = fs.readFileSync('analytics.js', 'utf8');
 const orderHelpers = fs.readFileSync('netlify/functions/_orders.js', 'utf8');
+const orderCreate = fs.readFileSync('netlify/functions/order-create.js', 'utf8');
 const ecpayReturn = fs.readFileSync('netlify/functions/ecpay-return.js', 'utf8');
 const statusSync = fs.readFileSync('netlify/functions/order-status-sync.js', 'utf8');
 
@@ -25,7 +26,8 @@ assert(browserAnalytics.includes("send_page_view: true"));
 assert(browserAnalytics.includes("track('select_content'"));
 assert(browserAnalytics.includes("track('purchase'"));
 assert(browserAnalytics.includes("const PURCHASED_ORDERS_KEY = 'ibuy-ga4-purchased-orders-v1'"));
-assert.match(checkout, /orderData\.orderId = result\.orderId;[\s\S]*IBuyAnalytics\.trackPurchase\(orderData\);[\s\S]*showSuccess\(orderData\);/);
+assert.match(checkout, /orderData\.orderId = result\.orderId;[\s\S]*showSuccess\(orderData\);/);
+assert(!checkout.includes('IBuyAnalytics.trackPurchase(orderData)'), 'bank purchase must have one canonical server-side sender');
 assert(browserAnalytics.includes("'utm_source', 'utm_medium', 'utm_campaign', 'utm_term', 'utm_content', 'campaign'"));
 
 const storage = () => {
@@ -34,16 +36,20 @@ const storage = () => {
 };
 const browserEvents = [];
 const browserContext = {
-  URLSearchParams, location: { search: '' }, sessionStorage: storage(), localStorage: storage(),
-  document: { cookie: '', addEventListener() {} }
+  URLSearchParams, location: { search: '', hash: '' }, sessionStorage: storage(), localStorage: storage(),
+  document: { cookie: '', addEventListener() {} }, console: { info() {} }
 };
 browserContext.window = browserContext;
 browserContext.gtag = (...args) => browserEvents.push(args);
 vm.runInNewContext(browserAnalytics, browserContext);
 browserContext.location.search = '?gtm_debug=test';
 assert.strictEqual(browserContext.IBuyAnalytics.orderAttribution().debug_mode, true);
+assert.deepStrictEqual(JSON.parse(browserContext.sessionStorage.getItem('ibuy-ga4-attribution-v1')), { debug_mode: true });
 browserContext.location.search = '';
 assert.strictEqual(browserContext.IBuyAnalytics.orderAttribution().debug_mode, true, 'debug mode must survive checkout navigation');
+assert.deepStrictEqual(JSON.parse(JSON.stringify(browserContext.IBuyAnalytics.diagnostics())), {
+  measurement_id: 'G-FRZ2RMV82S', debug_mode: true, attribution: { debug_mode: true }, purchased_transaction_ids: []
+});
 const browserOrder = {
   orderId: 'DZM123', productAmount: 600, discountAmount: 100, shippingFee: 70,
   discountCode: 'SAVE100', items: [{ productNo: 100001, name: '經典蜜汁', price: 200, qty: 3 }]
@@ -53,13 +59,14 @@ assert.strictEqual(browserContext.IBuyAnalytics.trackPurchase(browserOrder), fal
 const purchaseEvents = browserEvents.filter(args => args[0] === 'event' && args[1] === 'purchase');
 assert.strictEqual(purchaseEvents.length, 1, 'the same order must only emit one browser purchase');
 assert.deepStrictEqual(JSON.parse(JSON.stringify(purchaseEvents[0][2])), {
-  transaction_id: 'DZM123', value: 500, currency: 'TWD', shipping: 70, coupon: 'SAVE100',
+  debug_mode: true, transaction_id: 'DZM123', value: 500, currency: 'TWD', shipping: 70, coupon: 'SAVE100',
   items: [{ item_id: '100001', item_name: '經典蜜汁', price: 200, quantity: 3 }]
 });
 assert.strictEqual((home.match(/G-FRZ2RMV82S/g) || []).length, 1);
 assert.strictEqual((checkout.match(/G-FRZ2RMV82S/g) || []).length, 1);
 assert(orderHelpers.includes('analytics: data.analytics || null'), 'order attribution is not retained for purchase tracking');
 assert.match(ecpayReturn, /if \(created\.length\) \{[\s\S]*await syncSheet\(created\[0\]\);[\s\S]*await sendPurchase\(created\[0\]\);[\s\S]*\}/);
+assert.match(orderCreate, /if \(created\.length\) await sendPurchase\(savedOrder\);/);
 assert(!statusSync.includes('sendPurchase'), 'admin payment-status changes must not duplicate purchase tracking');
 
 const order = {

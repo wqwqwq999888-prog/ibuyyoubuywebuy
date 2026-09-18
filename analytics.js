@@ -20,7 +20,9 @@
 
   function debugMode() {
     const params = new URLSearchParams(location.search);
-    const current = params.has('gtm_debug') || params.get('debug_mode') === '1';
+    const hashParams = new URLSearchParams(String(location.hash || '').replace(/^#.*\?/, ''));
+    const current = params.has('gtm_debug') || params.get('debug_mode') === '1' ||
+      hashParams.has('gtm_debug') || hashParams.get('debug_mode') === '1';
     if (current) {
       try { sessionStorage.setItem(DEBUG_MODE_KEY, '1'); } catch (_) {}
     }
@@ -41,6 +43,7 @@
     if (campaign?.name) current.campaign_name = campaign.name;
     if (campaign?.partner_name) current.campaign_partner = campaign.partner_name;
     const saved = readJson(sessionStorage, ATTRIBUTION_KEY) || {};
+    if (debugMode()) current.debug_mode = true;
     const merged = { ...saved, ...current };
     try { sessionStorage.setItem(ATTRIBUTION_KEY, JSON.stringify(merged)); } catch (_) {}
     return merged;
@@ -105,7 +108,17 @@
     try {
       localStorage.setItem(PURCHASED_ORDERS_KEY, JSON.stringify([...transactionIds, transactionId].slice(-50)));
     } catch (_) {}
+    console.info(`GA4 purchase queued for ${transactionId}`);
     return true;
+  }
+
+  function diagnostics() {
+    return {
+      measurement_id: MEASUREMENT_ID,
+      debug_mode: debugMode(),
+      attribution: readJson(sessionStorage, ATTRIBUTION_KEY) || {},
+      purchased_transaction_ids: readJson(localStorage, PURCHASED_ORDERS_KEY) || []
+    };
   }
 
   document.addEventListener('click', event => {
@@ -115,5 +128,6 @@
     if (label) track('select_content', { content_type: 'cta', content_id: label });
   });
 
-  window.IBuyAnalytics = { attribution, orderAttribution, productReference, track, trackPurchase };
+  attribution();
+  window.IBuyAnalytics = { attribution, orderAttribution, productReference, track, trackPurchase, diagnostics };
 })();
