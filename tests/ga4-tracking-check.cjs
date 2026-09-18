@@ -19,8 +19,9 @@ for (const property of ['og:description', 'twitter:description']) assert(home.in
 
 for (const html of [home, checkout, vote]) {
   assert.match(html, /googletagmanager\.com\/gtag\/js\?id=G-FRZ2RMV82S/);
-  assert.match(html, /<script src="analytics\.js"><\/script>/);
+  assert.match(html, /<script src="analytics\.js\?v=20260918-1"><\/script>/);
 }
+assert.match(fs.readFileSync('netlify.toml', 'utf8'), /for = "\/analytics\.js"[\s\S]*Cache-Control = "no-cache, no-store, must-revalidate"/);
 for (const event of ['view_item', 'add_to_cart', 'begin_checkout']) assert(home.includes(`'${event}'`), `${event} is not instrumented`);
 assert(browserAnalytics.includes("send_page_view: true"));
 assert(browserAnalytics.includes("track('select_content'"));
