@@ -1,0 +1,6 @@
+User-agent: *
+Allow: /
+
+Disallow: /.netlify/functions/
+
+Sitemap: https://douzhenmai.com/sitemap.xml

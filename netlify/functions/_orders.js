@@ -28,7 +28,7 @@ function normalizeOrder(data, paymentStatus) {
     order_no: String(data.orderId), customer_name: String(data.customer.name), customer_phone: String(data.customer.phone),
     customer_email: String(data.customer.email), email_marketing_consent: data.emailMarketingConsent === true,
     items: data.items, product_amount: productAmount, discount_amount: discountAmount, shipping_fee: shippingFee,
-    order_amount: orderAmount, shipping_method: String(data.shipping?.method || ''), shipping_details: { ...(data.shipping || {}), campaign_id: data.campaignId || null },
+    order_amount: orderAmount, shipping_method: String(data.shipping?.method || ''), shipping_details: { ...(data.shipping || {}), campaign_id: data.campaignId || null, analytics: data.analytics || null },
     transfer_last_five: String(data.transfer5 || ''), transfer_time: data.transferTime || null, note: String(data.note || ''),
     payment_method: String(data.payment || ''), payment_status: paymentStatus, shipping_status: '待出貨',
     trade_no: String(data.tradeNo || ''), discount_code: data.discountCode || null, partner_name: data.partnerName || null

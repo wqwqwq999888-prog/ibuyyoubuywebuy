@@ -4,6 +4,9 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>結帳 — 鬥陣買肉乾</title>
+<meta name="robots" content="noindex, nofollow, noarchive">
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-FRZ2RMV82S"></script>
+<script src="analytics.js"></script>
 <style>
 :root {
   --gold: #C9A84C;
@@ -1030,6 +1033,7 @@ async function submitOrder() {
     partnerName: appliedDiscount?.partner_name || '',
     shippingFee: shippingFee,
     total: Math.max(0, getSubtotal() - discountAmount) + shippingFee,
+    analytics: IBuyAnalytics.orderAttribution(),
   };
 
   // 銀行匯款完成並填妥資料後，才由伺服器建立正式訂單。
@@ -1301,6 +1305,7 @@ function showToast(msg) {
     total: total,
     transfer5: '',
     transferTime: '',
+    analytics: IBuyAnalytics.orderAttribution(),
   };
   const params = {
     MerchantID: '3504484',

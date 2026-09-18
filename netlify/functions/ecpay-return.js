@@ -1,5 +1,6 @@
 const crypto = require('crypto');
 const { supabase, normalizeOrder, validateProductPricing, addProductCosts, syncSheet } = require('./_orders');
+const { sendPurchase } = require('./_analytics');
 
 exports.handler = async (event) => {
   if (event.httpMethod !== 'POST') {
@@ -50,7 +51,10 @@ exports.handler = async (event) => {
       }
       const order = await addProductCosts(repriced);
       const created = await supabase('orders?on_conflict=order_no', { method: 'POST', headers: { Prefer: 'resolution=ignore-duplicates,return=representation' }, body: JSON.stringify(order) });
-      if (created.length) await syncSheet(created[0]);
+      if (created.length) {
+        await syncSheet(created[0]);
+        await sendPurchase(created[0]);
+      }
       await supabase(`pending_ecpay_orders?order_no=eq.${encodeURIComponent(orderId)}`, { method: 'DELETE' });
     } catch(e) {
       console.error('建立付款訂單失敗:', e);
