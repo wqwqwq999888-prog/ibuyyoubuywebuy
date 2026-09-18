@@ -40,6 +40,10 @@ const browserContext = {
 browserContext.window = browserContext;
 browserContext.gtag = (...args) => browserEvents.push(args);
 vm.runInNewContext(browserAnalytics, browserContext);
+browserContext.location.search = '?gtm_debug=test';
+assert.strictEqual(browserContext.IBuyAnalytics.orderAttribution().debug_mode, true);
+browserContext.location.search = '';
+assert.strictEqual(browserContext.IBuyAnalytics.orderAttribution().debug_mode, true, 'debug mode must survive checkout navigation');
 const browserOrder = {
   orderId: 'DZM123', productAmount: 600, discountAmount: 100, shippingFee: 70,
   discountCode: 'SAVE100', items: [{ productNo: 100001, name: '經典蜜汁', price: 200, qty: 3 }]
@@ -56,7 +60,7 @@ assert.strictEqual((home.match(/G-FRZ2RMV82S/g) || []).length, 1);
 assert.strictEqual((checkout.match(/G-FRZ2RMV82S/g) || []).length, 1);
 assert(orderHelpers.includes('analytics: data.analytics || null'), 'order attribution is not retained for purchase tracking');
 assert.match(ecpayReturn, /if \(created\.length\) \{[\s\S]*await syncSheet\(created\[0\]\);[\s\S]*await sendPurchase\(created\[0\]\);[\s\S]*\}/);
-assert.match(statusSync, /existing\[0\]\.payment_status !== '已付款' && paymentStatus === '已付款' && rows\[0\]\.shipping_details\?\.analytics/);
+assert(!statusSync.includes('sendPurchase'), 'admin payment-status changes must not duplicate purchase tracking');
 
 const order = {
   order_no: 'D123', order_amount: 570, product_amount: 600, discount_amount: 100, shipping_fee: 70,
@@ -71,6 +75,9 @@ const payload = purchasePayload(order);
 assert.strictEqual(payload.client_id, '123.456');
 assert.strictEqual(payload.events[0].name, 'purchase');
 assert.deepStrictEqual(payload.events[0].params.items[0], { item_id: '100001', item_name: '經典蜜汁', price: 200, quantity: 3 });
+assert.strictEqual(payload.events[0].params.debug_mode, undefined);
+const debugPayload = purchasePayload({ ...order, shipping_details: { analytics: { ...order.shipping_details.analytics, debug_mode: true } } });
+assert.strictEqual(debugPayload.events[0].params.debug_mode, true);
 assert.deepStrictEqual({
   transaction_id: payload.events[0].params.transaction_id,
   currency: payload.events[0].params.currency,
@@ -96,7 +103,7 @@ for (const internal of ['product_cost', 'gross_profit', 'commission_amount']) {
   const oldSecret = process.env.GA4_API_SECRET;
   const oldFetch = global.fetch;
   delete process.env.GA4_API_SECRET;
-  assert.deepStrictEqual(await sendPurchase(order), { skipped: true });
+  assert.deepStrictEqual(await sendPurchase(order), { skipped: true, reason: 'missing_api_secret' });
 
   let request;
   process.env.GA4_API_SECRET = 'test-secret';

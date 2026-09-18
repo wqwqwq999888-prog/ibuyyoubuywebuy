@@ -5,6 +5,7 @@
   const ATTRIBUTION_KEY = 'ibuy-ga4-attribution-v1';
   const CAMPAIGN_KEY = 'ibuy-campaign-context';
   const PURCHASED_ORDERS_KEY = 'ibuy-ga4-purchased-orders-v1';
+  const DEBUG_MODE_KEY = 'ibuy-ga4-debug-mode';
   const ATTRIBUTION_PARAMS = ['utm_source', 'utm_medium', 'utm_campaign', 'utm_term', 'utm_content', 'campaign'];
 
   window.dataLayer = window.dataLayer || [];
@@ -17,7 +18,18 @@
     catch (_) { return null; }
   }
 
+  function debugMode() {
+    const params = new URLSearchParams(location.search);
+    const current = params.has('gtm_debug') || params.get('debug_mode') === '1';
+    if (current) {
+      try { sessionStorage.setItem(DEBUG_MODE_KEY, '1'); } catch (_) {}
+    }
+    try { return current || sessionStorage.getItem(DEBUG_MODE_KEY) === '1'; }
+    catch (_) { return current; }
+  }
+
   function attribution() {
+    debugMode();
     const params = new URLSearchParams(location.search);
     const current = {};
     ATTRIBUTION_PARAMS.forEach(key => {
@@ -64,7 +76,7 @@
   }
 
   function orderAttribution() {
-    return { client_id: clientId(), session_id: sessionId(), ...attribution() };
+    return { client_id: clientId(), session_id: sessionId(), debug_mode: debugMode() || undefined, ...attribution() };
   }
 
   function trackPurchase(order) {

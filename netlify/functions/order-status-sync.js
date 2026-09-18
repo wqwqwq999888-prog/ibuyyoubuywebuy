@@ -1,5 +1,4 @@
 const { supabase, syncSheet } = require('./_orders');
-const { sendPurchase } = require('./_analytics');
 const paymentStatuses = ['待付款', '已付款', '已匯款待確認', '付款失敗'];
 const shippingStatuses = ['待出貨', '已出貨', '已完成'];
 const json = (statusCode, body) => ({ statusCode, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
@@ -22,7 +21,6 @@ exports.handler = async event => {
     const rows = await supabase(`orders?order_no=eq.${encodeURIComponent(orderNo)}`, { method: 'PATCH', headers: { Prefer: 'return=representation' }, body: JSON.stringify({ payment_status: paymentStatus, shipping_status: shippingStatus }) });
     if (!rows.length) throw new Error('找不到訂單');
     await syncSheet(rows[0], 'updateStatus');
-    if (existing[0].payment_status !== '已付款' && paymentStatus === '已付款' && rows[0].shipping_details?.analytics) await sendPurchase(rows[0]);
     return json(200, rows[0]);
   } catch (error) { return json(400, { error: error.message }); }
 };
