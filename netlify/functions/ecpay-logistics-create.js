@@ -56,7 +56,8 @@ exports.handler = async event => {
     const goodsAmount = String(Math.max(1, Number(order.order_amount) - Number(order.shipping_fee || 0)));
     const params = {
       MerchantID: process.env.ECPAY_MERCHANT_ID || '3504484',
-      // ECPay consumes MerchantTradeNo even when an address is rejected.
+      // ECPay consumes MerchantTradeNo even when an address is rejected. Use a fresh
+      // logistics reference for every attempt while keeping our order_no unchanged.
       MerchantTradeNo: logisticsMerchantTradeNo(order.order_no),
       MerchantTradeDate: `${now.getFullYear()}/${pad(now.getMonth() + 1)}/${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`,
       LogisticsType: order.shipping_method === 'kuroneko' ? 'HOME' : 'CVS',
@@ -77,7 +78,7 @@ exports.handler = async event => {
       const senderAddress = clean(process.env.ECPAY_SENDER_ADDRESS || '台中市北屯區東山路一段365-6號', 60);
       Object.assign(params, {
         SenderZipCode: senderZipCode, SenderAddress: senderAddress,
-        ReceiverZipCode: clean(details.zipcode, 6), ReceiverAddress: clean(`${details.city || ''}${details.address || ''}`, 60),
+        ReceiverZipCode: clean(details.zipcode, 6), ReceiverAddress: clean(`${details.city || ''}${details.district || ''}${details.address || ''}`, 60),
         Temperature: '0001', Distance: '00', Specification: '0001', ScheduledPickupTime: '4', ScheduledDeliveryTime: '4'
       });
     }
