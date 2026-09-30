@@ -32,11 +32,11 @@ global.fetch = async (url, options) => {
   const response = await handler({ httpMethod: 'POST', headers: { authorization: 'Bearer test-jwt' }, body: JSON.stringify({ orderNo: order.order_no }) });
   assert.equal(response.statusCode, 400);
   assert.equal(sent.LogisticsSubType, 'TCAT');
-  assert.equal(sent.SenderName, '佑陞企業行');
-  assert.equal(sent.SenderPhone, '04-8725609');
-  assert.equal(sent.SenderCellPhone, undefined);
-  assert.equal(sent.SenderZipCode, '511');
-  assert.equal(sent.SenderAddress, '彰化縣社頭鄉山腳路2段830號');
+  assert.equal(sent.SenderName, '蕭百芳');
+  assert.equal(sent.SenderPhone, undefined);
+  assert.equal(sent.SenderCellPhone, '0925536966');
+  assert.equal(sent.SenderZipCode, '406');
+  assert.equal(sent.SenderAddress, '台中市北屯區東山路一段365-6號');
   assert.equal(sent.ReceiverZipCode, '111');
   assert.match(sent.ReceiverAddress, /台北市士林區/);
   console.log('ECPay Kuroneko sender checks passed.');
