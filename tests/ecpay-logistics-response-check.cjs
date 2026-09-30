@@ -11,6 +11,7 @@ assert.equal(created.AllPayLogisticsID, '12345');
 assert.equal(created.RtnCode, '300');
 assert.throws(() => parseCreateResponse('0|MerchantTradeNo duplicated'), /duplicated/);
 assert.throws(() => parseCreateResponse('1|RtnCode=300'), /確認是否已建單/);
+assert.throws(() => parseCreateResponse('<html><body>Merchant has no logistics permission</body></html>'), /Merchant has no logistics permission/);
 assert.equal(goodsName([{ name: '原味肉乾' }, { name: '辣味#肉乾' }]), '原味肉乾 辣味 肉乾');
 assert.ok(goodsName([{ name: '肉乾'.repeat(30) }]).length <= 25);
 
@@ -20,6 +21,7 @@ const order = {
   items: [{ name: '原味#肉乾' }], customer_name: '王小明', customer_phone: '0912345678', customer_email: 'test@example.com'
 };
 let sent;
+let sentHeaders;
 let createSucceeds = false;
 let saved;
 global.fetch = async (url, options) => {
@@ -28,6 +30,7 @@ global.fetch = async (url, options) => {
   if (url.includes('/rest/v1/orders?') && !options?.method) return { ok: true, text: async () => JSON.stringify([order]) };
   if (url.includes('/Express/Create')) {
     sent = Object.fromEntries(options.body);
+    sentHeaders = options.headers;
     return { ok: true, text: async () => createSucceeds
       ? '1|RtnCode=300&RtnMsg=OK&AllPayLogisticsID=987654321&CVSPaymentNo=123456789&CVSValidationNo=2468'
       : '0|10500000 Test rejection' };
@@ -48,6 +51,7 @@ handler({ httpMethod: 'POST', headers: { authorization: 'Bearer test-jwt' }, bod
     assert.equal(sent.CollectionAmount, sent.GoodsAmount);
     assert.equal(sent.IsCollection, 'N');
     assert.equal(sent.GoodsName, '原味 肉乾');
+    assert.equal(sentHeaders.Accept, 'text/html');
     createSucceeds = true;
     const success = await handler({ httpMethod: 'POST', headers: { authorization: 'Bearer test-jwt' }, body: JSON.stringify({ orderNo: order.order_no }) });
     assert.equal(success.statusCode, 200);
