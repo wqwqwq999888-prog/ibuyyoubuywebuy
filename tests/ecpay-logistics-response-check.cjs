@@ -4,7 +4,7 @@ process.env.SUPABASE_SECRET_KEY = 'test-secret';
 process.env.ECPAY_HASH_KEY = 'test-key';
 process.env.ECPAY_HASH_IV = 'test-iv';
 process.env.URL = 'https://example.netlify.app';
-const { handler, parseCreateResponse, goodsName } = require('../netlify/functions/ecpay-logistics-create');
+const { handler, parseCreateResponse, goodsName, logisticsMerchantTradeNo } = require('../netlify/functions/ecpay-logistics-create');
 
 const created = parseCreateResponse('1|MerchantID=3504484&MerchantTradeNo=ORDER123&RtnCode=300&RtnMsg=訂單建立成功&AllPayLogisticsID=12345');
 assert.equal(created.AllPayLogisticsID, '12345');
@@ -14,6 +14,8 @@ assert.throws(() => parseCreateResponse('1|RtnCode=300'), /確認是否已建單
 assert.throws(() => parseCreateResponse('<html><body>Merchant has no logistics permission</body></html>'), /Merchant has no logistics permission/);
 assert.equal(goodsName([{ name: '原味肉乾' }, { name: '辣味#肉乾' }]), '原味肉乾 辣味 肉乾');
 assert.ok(goodsName([{ name: '肉乾'.repeat(30) }]).length <= 25);
+assert.notEqual(logisticsMerchantTradeNo('D123', 1), logisticsMerchantTradeNo('D123', 2));
+assert.ok(logisticsMerchantTradeNo('D12345678901234567890', Date.now()).length <= 20);
 
 const order = {
   order_no: 'D1234567890123', payment_status: '已付款', shipping_method: '711',
@@ -47,6 +49,7 @@ handler({ httpMethod: 'POST', headers: { authorization: 'Bearer test-jwt' }, bod
     assert.equal(response.statusCode, 400);
     assert.match(JSON.parse(response.body).error, /10500000 Test rejection/);
     assert.equal(sent.LogisticsSubType, 'UNIMARTC2C');
+    assert.notEqual(sent.MerchantTradeNo, order.order_no);
     assert.equal(sent.GoodsAmount, '935');
     assert.equal(sent.CollectionAmount, sent.GoodsAmount);
     assert.equal(sent.IsCollection, 'N');
@@ -59,6 +62,7 @@ handler({ httpMethod: 'POST', headers: { authorization: 'Bearer test-jwt' }, bod
     assert.equal(saved.shipping_details.store711Id, '123456');
     assert.equal(saved.shipping_details.ecpay_cvs_payment_no, '123456789');
     assert.equal(saved.shipping_details.ecpay_cvs_validation_no, '2468');
+    assert.equal(saved.shipping_details.ecpay_logistics_merchant_trade_no, sent.MerchantTradeNo);
     console.log('ECPay logistics response checks passed.');
   })
   .catch(error => { console.error(error); process.exitCode = 1; });

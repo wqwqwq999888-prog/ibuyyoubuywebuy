@@ -52,7 +52,8 @@ function payload(overrides = {}) {
     { id: 'kuroneko', name: '黑貓宅配', fee: 145, free_threshold: 3200 }
   ]) {
     shipping = { ...method, enabled: true };
-    const methodOrder = await validateProductPricing(normalizeOrder(payload({ shipping: { method: method.id } }), '待付款'));
+    const methodShipping = method.id === 'kuroneko' ? { method: method.id, city: '台中市', address: '北屯區東山路一段365-6號' } : { method: method.id };
+    const methodOrder = await validateProductPricing(normalizeOrder(payload({ shipping: methodShipping }), '待付款'));
     assert.equal(methodOrder.shipping_fee, method.fee, `${method.name}必須套用各自的雲端基本運費`);
     assert.equal(methodOrder.order_amount, 1040 + method.fee);
   }

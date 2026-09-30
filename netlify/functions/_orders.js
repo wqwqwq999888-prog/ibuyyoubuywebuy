@@ -19,6 +19,11 @@ async function supabase(path, options = {}) {
 function normalizeOrder(data, paymentStatus) {
   if (!data || !data.orderId || !data.customer?.name || !data.customer?.phone || !data.customer?.email) throw new Error('訂單資料不完整');
   if (!Array.isArray(data.items) || !data.items.length) throw new Error('購物車不可為空');
+  if (data.shipping?.method === 'kuroneko') {
+    const city = String(data.shipping.city || '').trim();
+    const address = String(data.shipping.address || '').trim();
+    if (!city || !address || !/[區鄉鎮市]/.test(address)) throw new Error('黑貓宅配地址請包含鄉鎮市區');
+  }
   const productAmount = Number(data.productAmount ?? data.subtotal);
   const discountAmount = Number(data.discountAmount || 0);
   const shippingFee = Number(data.shippingFee || 0);
