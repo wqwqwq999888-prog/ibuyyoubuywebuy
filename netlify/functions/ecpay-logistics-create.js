@@ -19,8 +19,13 @@ function goodsName(items) {
 }
 // Express/Create returns either "1|key=value&..." or "0|error message".
 function parseCreateResponse(text) {
-  const match = /^([01])\|([\s\S]*)$/.exec(String(text || '').trim());
-  if (!match) throw new Error('綠界物流回應格式不正確，請先到綠界後台確認是否已建單');
+  const raw = String(text || '').replace(/^\uFEFF/, '').trim();
+  const match = /^([01])\|([\s\S]*)$/.exec(raw);
+  if (!match) {
+    const detail = raw.replace(/<script[\s\S]*?<\/script>/gi, ' ').replace(/<style[\s\S]*?<\/style>/gi, ' ')
+      .replace(/<[^>]+>/g, ' ').replace(/&nbsp;/gi, ' ').replace(/\s+/g, ' ').trim().slice(0, 180);
+    throw new Error(`綠界回應異常：${detail || '空白回應'}（請確認此特店的黑貓宅配 API 權限）`);
+  }
   if (match[1] === '0') throw new Error(match[2].trim() || '綠界物流建單失敗');
   const result = Object.fromEntries(new URLSearchParams(match[2]));
   if (!result.AllPayLogisticsID || result.RtnCode !== '300') {
@@ -73,7 +78,7 @@ exports.handler = async event => {
     }
     if (!params.LogisticsSubType || (params.LogisticsType === 'CVS' && !params.ReceiverStoreID) || (params.LogisticsType === 'HOME' && (!params.ReceiverZipCode || !params.ReceiverAddress))) return json(400, { error: '配送資料不完整' });
     params.CheckMacValue = checkMacValue(params, 'md5');
-    const response = await fetch('https://logistics.ecpay.com.tw/Express/Create', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams(params) });
+    const response = await fetch('https://logistics.ecpay.com.tw/Express/Create', { method: 'POST', headers: { Accept: 'text/html', 'Content-Type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams(params) });
     const text = await response.text();
     if (!response.ok) throw new Error(`綠界物流建單失敗 (${response.status})，請先到綠界後台確認是否已建單`);
     const result = parseCreateResponse(text);
