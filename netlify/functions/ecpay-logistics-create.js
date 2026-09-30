@@ -53,18 +53,18 @@ exports.handler = async event => {
       LogisticsSubType: ({ '711': 'UNIMARTC2C', family: 'FAMIC2C', kuroneko: 'TCAT' })[order.shipping_method],
       GoodsAmount: goodsAmount,
       CollectionAmount: order.shipping_method === '711' ? goodsAmount : '0', IsCollection: 'N', GoodsName: goodsName(order.items),
-      SenderName: clean(process.env.ECPAY_SENDER_NAME || '佑陞企業行', 10),
+      SenderName: clean(process.env.ECPAY_SENDER_NAME || '蕭百芳', 10),
       ReceiverName: clean(order.customer_name, 10), ReceiverCellPhone: clean(order.customer_phone, 20),
       ReceiverEmail: clean(order.customer_email, 50),
       ServerReplyURL: `${process.env.URL || process.env.DEPLOY_PRIME_URL}/.netlify/functions/ecpay-logistics-callback`
     };
-    const senderPhone = clean(process.env.ECPAY_SENDER_PHONE || '04-8725609', 20);
+    const senderPhone = clean(process.env.ECPAY_SENDER_PHONE || '0925536966', 20);
     if (/^09\d{8}$/.test(senderPhone)) params.SenderCellPhone = senderPhone;
     else params.SenderPhone = senderPhone;
     if (params.LogisticsType === 'CVS') params.ReceiverStoreID = clean(order.shipping_method === '711' ? details.store711Id : details.storefamilyId, 10);
     else {
-      const senderZipCode = clean(process.env.ECPAY_SENDER_ZIPCODE || '511', 6);
-      const senderAddress = clean(process.env.ECPAY_SENDER_ADDRESS || '彰化縣社頭鄉山腳路2段830號', 60);
+      const senderZipCode = clean(process.env.ECPAY_SENDER_ZIPCODE || '406', 6);
+      const senderAddress = clean(process.env.ECPAY_SENDER_ADDRESS || '台中市北屯區東山路一段365-6號', 60);
       Object.assign(params, {
         SenderZipCode: senderZipCode, SenderAddress: senderAddress,
         ReceiverZipCode: clean(details.zipcode, 6), ReceiverAddress: clean(`${details.city || ''}${details.address || ''}`, 60),
