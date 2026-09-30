@@ -21,8 +21,10 @@ function normalizeOrder(data, paymentStatus) {
   if (!Array.isArray(data.items) || !data.items.length) throw new Error('購物車不可為空');
   if (data.shipping?.method === 'kuroneko') {
     const city = String(data.shipping.city || '').trim();
+    const district = String(data.shipping.district || '').trim();
     const address = String(data.shipping.address || '').trim();
-    if (!city || !address || !/[區鄉鎮市]/.test(address)) throw new Error('黑貓宅配地址請包含鄉鎮市區');
+    const cityArea = city.replace(/^[^縣市]+[縣市]/, '');
+    if (!city || !address || !/[區鄉鎮市]/.test(`${cityArea}${district}${address}`)) throw new Error('黑貓宅配地址請包含鄉鎮市區');
   }
   const productAmount = Number(data.productAmount ?? data.subtotal);
   const discountAmount = Number(data.discountAmount || 0);
