@@ -4,6 +4,10 @@ const { logisticsNumbers } = require('./_ecpay-logistics-number');
 const json = (statusCode, body) => ({ statusCode, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
 const clean = (value, max) => String(value || '').replace(/[&<>]/g, '').slice(0, max);
 const pad = value => String(value).padStart(2, '0');
+function logisticsMerchantTradeNo(orderNo, time = Date.now()) {
+  const suffix = Number(time).toString(36).toUpperCase().slice(-7);
+  return `${clean(orderNo, 12)}L${suffix}`.slice(0, 20);
+}
 function goodsName(items) {
   const name = (items || []).map(item => String(item.name || '')).join(' ')
     .replace(/[\^‘'`!@#%&*+\\”<>|_\[\]]/g, ' ').replace(/\s+/g, ' ').trim() || '商品';
@@ -52,7 +56,8 @@ exports.handler = async event => {
     const goodsAmount = String(Math.max(1, Number(order.order_amount) - Number(order.shipping_fee || 0)));
     const params = {
       MerchantID: process.env.ECPAY_MERCHANT_ID || '3504484',
-      MerchantTradeNo: clean(order.order_no, 20),
+      // ECPay consumes MerchantTradeNo even when an address is rejected.
+      MerchantTradeNo: logisticsMerchantTradeNo(order.order_no),
       MerchantTradeDate: `${now.getFullYear()}/${pad(now.getMonth() + 1)}/${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`,
       LogisticsType: order.shipping_method === 'kuroneko' ? 'HOME' : 'CVS',
       LogisticsSubType: ({ '711': 'UNIMARTC2C', family: 'FAMIC2C', kuroneko: 'TCAT' })[order.shipping_method],
@@ -82,10 +87,11 @@ exports.handler = async event => {
     const text = await response.text();
     if (!response.ok) throw new Error(`綠界物流建單失敗 (${response.status})，請先到綠界後台確認是否已建單`);
     const result = parseCreateResponse(text);
-    const updated = await supabase(`orders?order_no=eq.${encodeURIComponent(order.order_no)}`, { method: 'PATCH', headers: { Prefer: 'return=representation' }, body: JSON.stringify({ logistics_trade_no: result.AllPayLogisticsID, logistics_status: result.RtnCode, logistics_message: result.RtnMsg || '', logistics_created_at: new Date().toISOString(), shipping_details: { ...details, ...logisticsNumbers(result) } }) });
+    const updated = await supabase(`orders?order_no=eq.${encodeURIComponent(order.order_no)}`, { method: 'PATCH', headers: { Prefer: 'return=representation' }, body: JSON.stringify({ logistics_trade_no: result.AllPayLogisticsID, logistics_status: result.RtnCode, logistics_message: result.RtnMsg || '', logistics_created_at: new Date().toISOString(), shipping_details: { ...details, ecpay_logistics_merchant_trade_no: params.MerchantTradeNo, ...logisticsNumbers(result) } }) });
     return json(200, updated[0]);
   } catch (error) { return json(error.statusCode || 400, { error: error.message }); }
 };
 
 exports.parseCreateResponse = parseCreateResponse;
 exports.goodsName = goodsName;
+exports.logisticsMerchantTradeNo = logisticsMerchantTradeNo;
