@@ -208,7 +208,7 @@ function shippingDetailsText(order) {
   const details=order.shipping_details||{};
   if(order.shipping_method==='711') return [`7-11：${details.store711||''}`,details.store711Address||''].filter(Boolean).join('／');
   if(order.shipping_method==='family') return [`全家：${details.storefamily||''}`,details.storefamilyAddress||''].filter(Boolean).join('／');
-  return [details.city||'',details.address||''].filter(Boolean).join(' ') || '—';
+  return [details.city||'',details.district||'',details.address||''].filter(Boolean).join(' ') || '—';
 }
 function canCreateLogistics(order) { return order.shipping_method !== 'meetup' && ['已付款','已匯款待確認'].includes(order.payment_status) && !order.logistics_trade_no; }
 function logisticsPrintNumber(order) {

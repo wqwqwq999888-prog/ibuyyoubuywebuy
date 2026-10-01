@@ -430,6 +430,13 @@ nav {
               </select>
               <span class="err-msg">請選擇縣市</span>
             </div>
+            <div class="field" id="field-district">
+              <label>鄉鎮市區 <span class="req">*</span></label>
+              <select id="district" onchange="updateZipcode()" disabled>
+                <option value="">請先選擇縣市</option>
+              </select>
+              <span class="err-msg">請選擇鄉鎮市區</span>
+            </div>
             <div class="field" id="field-zipcode">
               <label>郵遞區號</label>
               <input type="text" id="zipcode" placeholder="自動帶入" readonly style="background:var(--dark4);color:var(--text-dim)">
@@ -437,9 +444,9 @@ nav {
           </div>
           <div class="form-row single">
             <div class="field" id="field-address">
-              <label>詳細地址 <span class="req">*</span></label>
-              <input type="text" id="address" placeholder="鄉鎮市區、路名、巷弄號樓">
-              <span class="err-msg">請填寫詳細地址</span>
+              <label>詳細地址（須含鄉鎮市區） <span class="req">*</span></label>
+              <input type="text" id="address" placeholder="例如：北屯區東山路一段365-6號">
+              <span class="err-msg">請填寫包含鄉鎮市區的完整地址</span>
             </div>
           </div>
         </div>
@@ -904,15 +911,19 @@ function selectPayment(type, el) {
 }
 
 // 縣市/郵遞區號
-const zipMap = {
-  '台北市':'100','新北市':'220','基隆市':'200','桃園市':'330','新竹市':'300',
-  '新竹縣':'302','苗栗縣':'360','台中市':'400','彰化縣':'500','南投縣':'540',
-  '雲林縣':'640','嘉義市':'600','嘉義縣':'602','台南市':'700','高雄市':'800',
-  '屏東縣':'900','宜蘭縣':'260','花蓮縣':'970','台東縣':'950','澎湖縣':'880','金門縣':'890'
-};
+let taiwanDistricts = {};
+fetch('/data/taiwan-districts.json').then(response => response.json()).then(data => { taiwanDistricts = data; updateDistricts(); }).catch(() => showToast('行政區資料載入失敗，請重新整理頁面'));
 function updateDistricts() {
   const city = document.getElementById('city').value;
-  document.getElementById('zipcode').value = zipMap[city] || '';
+  const district = document.getElementById('district');
+  const districts = taiwanDistricts[city.replace(/^台/, '臺')] || [];
+  district.innerHTML = `<option value="">${city ? '請選擇鄉鎮市區' : '請先選擇縣市'}</option>${districts.map(item => `<option value="${item.name}" data-zip="${item.zip}">${item.name}</option>`).join('')}`;
+  district.disabled = !districts.length;
+  document.getElementById('zipcode').value = '';
+}
+function updateZipcode() {
+  const option = document.getElementById('district').selectedOptions[0];
+  document.getElementById('zipcode').value = option?.dataset.zip || '';
 }
 
 // 驗證
@@ -1013,6 +1024,7 @@ async function submitOrder() {
       storefamilyId: document.getElementById('storefamilyId')?.value || '',
       storefamilyAddress: document.getElementById('storefamilyAddress')?.value || '',
       city: document.getElementById('city')?.value || '',
+      district: document.getElementById('district')?.value || '',
       zipcode: document.getElementById('zipcode')?.value || '',
       address: document.getElementById('address')?.value || '',
     },
@@ -1287,6 +1299,7 @@ function showToast(msg) {
       storefamilyId: document.getElementById('storefamilyId')?.value || '',
       storefamilyAddress: document.getElementById('storefamilyAddress')?.value || '',
       city: document.getElementById('city')?.value || '',
+      district: document.getElementById('district')?.value || '',
       zipcode: document.getElementById('zipcode')?.value || '',
       address: document.getElementById('address')?.value || '',
     },
@@ -1400,10 +1413,12 @@ function validateStep1() {
     const s = document.getElementById('storefamily').value.trim();
     setErr('storefamily', !s); if (!s) ok = false;
   }
-if (selectedShipping === 'kuroneko') {
+  if (selectedShipping === 'kuroneko') {
     const city = document.getElementById('city').value;
+    const district = document.getElementById('district').value;
     const addr = document.getElementById('address').value.trim();
     setErr('city', !city); if (!city) ok = false;
+    setErr('district', !district); if (!district) ok = false;
     setErr('address', !addr); if (!addr) ok = false;
   }
 
