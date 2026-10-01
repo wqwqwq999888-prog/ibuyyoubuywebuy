@@ -322,17 +322,82 @@ function updateManualTotal() {
   const discounted=Math.max(0,subtotal-discount); const shippingFee=method==='meetup'||!shipping||discounted>=Number(shipping.free_threshold)?0:Number(shipping.fee||0);
   $('#manualSubtotal').textContent=money(subtotal); $('#manualShippingFee').textContent=money(shippingFee); $('#manualOrderTotal').textContent=money(discounted+shippingFee);
 }
+let manualDistricts = {};
+let manualStorePicker = null;
+function closeManualStorePicker() {
+  if(manualStorePicker)manualStorePicker.popup.close();
+  manualStorePicker=null;
+}
+async function loadManualDistricts() {
+  const editor=state.editor;
+  try {
+    if(!Object.keys(manualDistricts).length){
+      const response=await fetch('../data/taiwan-districts.json');
+      if(!response.ok)throw new Error('行政區資料載入失敗');
+      manualDistricts=await response.json();
+    }
+    if(state.editor!==editor)return;
+    $('#field-city').innerHTML='<option value="">請選擇縣市</option>'+Object.keys(manualDistricts).filter(city=>city!=='南海島').map(city=>`<option value="${escapeHtml(city)}">${escapeHtml(city)}</option>`).join('');
+    $('#reloadManualDistricts').classList.add('hidden');
+    updateManualDistricts();
+  } catch(error) {
+    if(state.editor!==editor)return;
+    $('#field-city').innerHTML='<option value="">載入失敗，請重試</option>';
+    $('#reloadManualDistricts').classList.remove('hidden');
+    toast('行政區資料載入失敗，請點重新載入');
+  }
+}
+function updateManualDistricts() {
+  const districts=manualDistricts[$('#field-city').value]||[];
+  $('#field-district').innerHTML='<option value="">請選擇鄉鎮市區</option>'+districts.map(item=>`<option value="${escapeHtml(item.name)}">${escapeHtml(item.name)}</option>`).join('');
+  $('#field-district').disabled=!districts.length;
+  $('#field-zipcode').value='';
+}
+function selectManualStore() {
+  const method=$('#field-shipping_method').value;
+  if(!['711','family'].includes(method))return;
+  closeManualStorePicker();
+  const popup=window.open(`/.netlify/functions/ecpay-cvs-map?type=${method==='711'?'UNIMARTC2C':'FAMIC2C'}`,'adminSelectStore','width=1000,height=700,scrollbars=yes');
+  if(!popup){toast('請允許彈出視窗後，再選擇門市');return;}
+  manualStorePicker={popup,method,editor:state.editor};
+}
+window.addEventListener('message',event=>{
+  const picker=manualStorePicker;
+  // The existing ECPay callback uses the production Netlify origin.
+  if(!picker||event.source!==picker.popup||![location.origin,'https://astounding-rabanadas-a0a6e1.netlify.app'].includes(event.origin))return;
+  if(state.editor!==picker.editor||$('#field-shipping_method').value!==picker.method)return;
+  const data=event.data;
+  if(!data||typeof data.storeId!=='string'||!data.storeId.trim()||typeof data.storeName!=='string'||!data.storeName.trim())return;
+  $('#field-store_id').value=data.storeId.trim();
+  $('#field-store_name').value=data.storeName.trim();
+  $('#field-store_address').value=typeof data.storeAddress==='string'?data.storeAddress.trim():'';
+  closeManualStorePicker();
+});
+
 function updateManualDeliveryFields() {
-  const method=$('#field-shipping_method').value; const isShipping=method!=='meetup'; const isStore=['711','family'].includes(method);
+  const method=$('#field-shipping_method').value;
+  if(state.editor.deliveryMethod!==method){
+    closeManualStorePicker();
+    ['store_id','store_name','store_address'].forEach(name=>{$(`#field-${name}`).value='';});
+    state.editor.deliveryMethod=method;
+  }
+  const isShipping=method!=='meetup'; const isStore=['711','family'].includes(method);
   $('#manualRecipientPhone').classList.toggle('hidden',!isShipping); $('#field-recipient_phone').required=isShipping;
   $('#manualStoreFields').classList.toggle('hidden',!isStore); $('#field-store_id').required=isStore; $('#field-store_name').required=isStore;
-  $('#manualHomeFields').classList.toggle('hidden',method!=='kuroneko'); ['zipcode','city','address'].forEach(name=>{$(`#field-${name}`).required=method==='kuroneko';});
+  $('#manualHomeFields').classList.toggle('hidden',method!=='kuroneko'); ['zipcode','city','district','address'].forEach(name=>{$(`#field-${name}`).required=method==='kuroneko';});
   $('#field-shipping_status').previousElementSibling.textContent=method==='meetup'?'面交狀態':'出貨狀態'; updateManualTotal();
 }
 function openManualOrder() {
   state.editor={type:'manual-order'}; $('#modalTitle').textContent='手動建單';
   const deliveryChoices=[['meetup','面交（免運）'],...state.data.shipping_methods.filter(item=>item.enabled).map(item=>[item.id,item.name])];
-  $('#editorFields').innerHTML=`<div class="wide manual-order-help">適用於 LINE、Facebook、Instagram 或電話私訊訂單；不使用綠界金流。選擇寄送時會套用目前物流運費，之後可從訂單清單建立綠界物流單。</div>${input('order_date','訂單日期與時間',toLocalInput(new Date()),{type:'datetime-local',required:true})}${input('customer_name','客戶姓名','',{required:true})}${input('customer_email','Email（選填）','',{type:'email'})}${input('contact_type','主要聯繫管道','line',{type:'select',choices:[['line','LINE'],['facebook','Facebook'],['instagram','Instagram'],['phone','手機電話']]})}${input('contact_value','聯繫帳號／電話','',{required:true})}${input('payment_method','收款方式','cash',{type:'select',choices:[['cash','現金'],['bank','銀行匯款']]})}${input('payment_status','付款狀態','已付款',{type:'select',choices:[['已付款','已收款'],['待付款','尚未收款'],['已匯款待確認','已匯款待確認']]})}${input('shipping_method','交付方式','meetup',{type:'select',choices:deliveryChoices})}${input('shipping_status','面交狀態','已完成',{type:'select',choices:[['已完成','已完成／已面交'],['待出貨','待處理／待出貨']]})}<div id="manualRecipientPhone" class="wide hidden">${input('recipient_phone','收件人手機（物流必填）','',{required:true})}</div><div id="manualStoreFields" class="wide field-grid hidden">${input('store_id','綠界門市代號','')}${input('store_name','門市名稱','')}${input('store_address','門市地址（選填）','',{wide:true})}</div><div id="manualHomeFields" class="wide field-grid hidden">${input('zipcode','郵遞區號','')}${input('city','縣市／區域','')}${input('address','宅配地址','',{wide:true})}</div><div class="wide"><label>商品明細</label><div id="manualItems" class="manual-items"></div><button id="addManualItem" class="secondary-button" type="button">＋ 增加商品</button></div>${input('manual_discount','優惠折扣金額',0,{type:'number',min:0,step:'1',required:true})}${input('note','備註','',{type:'textarea',wide:true})}<div class="wide manual-total"><span>商品 <b id="manualSubtotal">NT$ 0</b>　＋　運費 <b id="manualShippingFee">NT$ 0</b>　－　優惠</span><strong id="manualOrderTotal">NT$ 0</strong></div>`;
+  $('#editorFields').innerHTML=`<div class="wide manual-order-help">適用於 LINE、Facebook、Instagram 或電話私訊訂單；不使用綠界金流。選擇寄送時會套用目前物流運費，之後可從訂單清單建立綠界物流單。</div>${input('order_date','訂單日期與時間',toLocalInput(new Date()),{type:'datetime-local',required:true})}${input('customer_name','客戶姓名','',{required:true})}${input('customer_email','Email（選填）','',{type:'email'})}${input('contact_type','主要聯繫管道','line',{type:'select',choices:[['line','LINE'],['facebook','Facebook'],['instagram','Instagram'],['phone','手機電話']]})}${input('contact_value','聯繫帳號／電話','',{required:true})}${input('payment_method','收款方式','cash',{type:'select',choices:[['cash','現金'],['bank','銀行匯款']]})}${input('payment_status','付款狀態','已付款',{type:'select',choices:[['已付款','已收款'],['待付款','尚未收款'],['已匯款待確認','已匯款待確認']]})}${input('shipping_method','交付方式','meetup',{type:'select',choices:deliveryChoices})}${input('shipping_status','面交狀態','已完成',{type:'select',choices:[['已完成','已完成／已面交'],['待出貨','待處理／待出貨']]})}<div id="manualRecipientPhone" class="wide hidden">${input('recipient_phone','收件人手機（物流必填）','',{required:true})}</div><div id="manualStoreFields" class="wide field-grid hidden"><div class="wide"><button id="selectManualStore" class="secondary-button" type="button">選擇取貨門市</button><p>請透過選店視窗選擇門市，資料會自動帶入。</p></div>${input('store_id','門市代號','')}${input('store_name','門市名稱','')}${input('store_address','門市地址','',{wide:true})}</div><div id="manualHomeFields" class="wide field-grid hidden">${input('city','縣市','',{type:'select',choices:[['','載入中…']]})}${input('district','鄉鎮市區','',{type:'select',choices:[['','請先選擇縣市']]})}${input('zipcode','郵遞區號（自動帶入）','')}${input('address','詳細地址（路、巷、弄、號、樓）','',{wide:true})}<button id="reloadManualDistricts" class="secondary-button hidden" type="button">重新載入行政區</button></div><div class="wide"><label>商品明細</label><div id="manualItems" class="manual-items"></div><button id="addManualItem" class="secondary-button" type="button">＋ 增加商品</button></div>${input('manual_discount','優惠折扣金額',0,{type:'number',min:0,step:'1',required:true})}${input('note','備註','',{type:'textarea',wide:true})}<div class="wide manual-total"><span>商品 <b id="manualSubtotal">NT$ 0</b>　＋　運費 <b id="manualShippingFee">NT$ 0</b>　－　優惠</span><strong id="manualOrderTotal">NT$ 0</strong></div>`;
+  ['store_id','store_name','store_address','zipcode'].forEach(name=>{$(`#field-${name}`).readOnly=true;});
+  $('#field-district').disabled=true;
+  $('#selectManualStore').addEventListener('click',selectManualStore);
+  $('#reloadManualDistricts').addEventListener('click',loadManualDistricts);
+  $('#field-city').addEventListener('change',updateManualDistricts);
+  $('#field-district').addEventListener('change',()=>{ $('#field-zipcode').value=manualDistricts[$('#field-city').value]?.find(item=>item.name===$('#field-district').value)?.zip||''; });
+  loadManualDistricts();
   addManualItem(); updateManualDeliveryFields(); showModal();
 }
 function openDeleteOrder(order) {
@@ -344,7 +409,7 @@ function openDeleteOrder(order) {
 
 function toLocalInput(value) { if (!value) return ''; const date = new Date(value); return new Date(date.getTime() - date.getTimezoneOffset()*60000).toISOString().slice(0,16); }
 function showModal() { $('#modalBackdrop').classList.remove('hidden'); document.body.style.overflow = 'hidden'; }
-function closeModal() { $('#modalBackdrop').classList.add('hidden'); document.body.style.overflow = ''; state.editor = null; $('#editorSubmit').textContent='儲存'; $('#editorSubmit').disabled=false; }
+function closeModal() { closeManualStorePicker(); $('#modalBackdrop').classList.add('hidden'); document.body.style.overflow = ''; state.editor = null; $('#editorSubmit').textContent='儲存'; $('#editorSubmit').disabled=false; }
 function toast(message) { $('#toast').textContent = message; $('#toast').classList.remove('hidden'); clearTimeout(toast.timer); toast.timer = setTimeout(() => $('#toast').classList.add('hidden'), 2600); }
 function setSaving(saving) { $('#saveStatus').textContent = saving ? '儲存中…' : '資料已同步'; }
 function newId() { return crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`; }
@@ -365,8 +430,12 @@ async function submitEditor(event) {
       const items=$$('.manual-item').map(row=>({productNo:row.querySelector('.manual-product').value,qty:Number(row.querySelector('.manual-qty').value)}));
       if(!items.length||items.some(item=>!item.productNo))throw new Error('請至少選擇一項商品');
       const shippingDetails={contact_type:data.contact_type,contact_value:data.contact_value.trim()};
-      if(['711','family'].includes(data.shipping_method)){const prefix=data.shipping_method==='711'?'store711':'storefamily';shippingDetails[`${prefix}Id`]=data.store_id.trim();shippingDetails[prefix]=data.store_name.trim();shippingDetails[`${prefix}Address`]=data.store_address.trim();}
-      if(data.shipping_method==='kuroneko')Object.assign(shippingDetails,{zipcode:data.zipcode.trim(),city:data.city.trim(),address:data.address.trim()});
+      if(['711','family'].includes(data.shipping_method)){if(!data.store_id.trim()||!data.store_name.trim())throw new Error('請先選擇取貨門市');const prefix=data.shipping_method==='711'?'store711':'storefamily';shippingDetails[`${prefix}Id`]=data.store_id.trim();shippingDetails[prefix]=data.store_name.trim();shippingDetails[`${prefix}Address`]=data.store_address.trim();}
+      if(data.shipping_method==='kuroneko'){
+        const district=manualDistricts[data.city]?.find(item=>item.name===data.district);
+        if(!district||district.zip!==data.zipcode||!data.address.trim())throw new Error('請選擇縣市、鄉鎮市區並填寫詳細地址');
+        Object.assign(shippingDetails,{zipcode:district.zip,city:data.city,district:data.district,address:data.address.trim()});
+      }
       const customerPhone=data.shipping_method==='meetup'?(data.contact_type==='phone'?data.contact_value.trim():''):data.recipient_phone.trim();
       const payload={orderDate:orderDate.toISOString(),customer:{name:data.customer_name.trim(),phone:customerPhone,email:data.customer_email.trim()},contact:{type:data.contact_type,value:data.contact_value.trim()},items,discountAmount:Number(data.manual_discount||0),paymentMethod:data.payment_method,paymentStatus:data.payment_status,shippingStatus:data.shipping_status,shipping:{method:data.shipping_method,details:shippingDetails},note:data.note.trim()};
       if(isLocal){

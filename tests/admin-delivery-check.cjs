@@ -1,0 +1,28 @@
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const vm = require('node:vm');
+const source = fs.readFileSync('admin/app.js','utf8');
+const fields = {};
+const $ = id => fields[id] ||= {value:'',innerHTML:'',classList:{add(){},remove(){}}};
+let listener, closed=0;
+const popup={close(){closed++;}};
+const context={ $, state:{editor:{type:'manual-order'}}, location:{origin:'https://shop.example'}, escapeHtml:s=>s, toast(){}, fetch:async()=>({ok:true,json:async()=>JSON.parse(fs.readFileSync('data/taiwan-districts.json','utf8'))}), window:{open:()=>popup,addEventListener:(type,fn)=>{listener=fn;}} };
+vm.createContext(context);
+vm.runInContext(source.slice(source.indexOf('let manualDistricts ='),source.indexOf('function updateManualDeliveryFields()')),context);
+(async()=>{
+ await context.loadManualDistricts();
+ $('#field-city').value='臺北市'; context.updateManualDistricts();
+ assert.match($('#field-district').innerHTML,/大安區/);
+ $('#field-zipcode').value='106'; $('#field-city').value='新北市';context.updateManualDistricts();
+ assert.equal($('#field-zipcode').value,'');
+ assert.match($('#field-district').innerHTML,/板橋區/);
+ $('#field-shipping_method').value='711';context.selectManualStore();
+ const data={storeId:'123456',storeName:'測試門市',storeAddress:'測試地址'};
+ listener({source:popup,origin:'https://evil.example',data});assert.equal($('#field-store_id').value,'');
+ listener({source:{},origin:context.location.origin,data});assert.equal($('#field-store_id').value,'');
+ listener({source:popup,origin:context.location.origin,data});assert.equal($('#field-store_id').value,'123456');assert.equal(closed,1);
+ context.selectManualStore();$('#field-shipping_method').value='family';
+ listener({source:popup,origin:context.location.origin,data:{...data,storeId:'wrong'}});assert.equal($('#field-store_id').value,'123456');
+ context.closeManualStorePicker();assert.equal(closed,2);
+ console.log('Admin delivery checks passed.');
+})().catch(error=>{console.error(error);process.exitCode=1;});
