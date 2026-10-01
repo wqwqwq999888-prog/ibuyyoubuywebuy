@@ -48,6 +48,7 @@ assert.ok(home.includes('PRODUCT_IMAGE_PLACEHOLDER') && !home.includes('oldFlavo
 const staticIds = new Set([...html.matchAll(/id="([^"]+)"/g)].map(match => match[1]));
 const referencedIds = new Set([...app.matchAll(/\$\('#([^']+)'\)/g)].map(match => match[1]));
 const dynamicIds = new Set(['field-name', 'field-product_no', 'imagePreview', 'productImage', 'manualItems', 'manualSubtotal', 'manualShippingFee', 'manualOrderTotal', 'field-manual_discount', 'field-shipping_method', 'field-shipping_status', 'manualRecipientPhone', 'field-recipient_phone', 'manualStoreFields', 'field-store_id', 'field-store_name', 'manualHomeFields', 'field-zipcode', 'field-city', 'field-address']);
+['reloadManualDistricts','field-district','field-store_address','selectManualStore'].forEach(id=>dynamicIds.add(id));
 const missing = [...referencedIds].filter(id => !staticIds.has(id) && !dynamicIds.has(id));
 assert.deepEqual(missing, [], `找不到畫面元件：${missing.join(', ')}`);
 
@@ -150,7 +151,7 @@ assert.ok(sheetDeleteAt >= 0 && sheetDeleteAt < ordersDeleteAt && ordersDeleteAt
 assert.ok(orderDelete.includes('不在此取消或修改任何綠界交易或物流單'), '刪除 endpoint 不得取消或修改綠界交易或物流單');
 assert.ok(sheetScript.includes("request.action === 'deleteOrder'") && sheetScript.includes("headers.indexOf('訂單編號')") && sheetScript.includes("createTextOutput('DELETED')"), 'Apps Script 必須依訂單編號欄刪除整列並明確回覆 DELETED');
 assert.ok(orderHelper.includes("action === 'deleteOrder' ? 'DELETED' : 'OK'") && orderHelper.includes("if (action === 'deleteOrder') throw"), '刪除必須要求 DELETED，且未設定 Sheet webhook 時停止');
-assert.ok(html.includes('app.js?v=2026091702'), 'admin/app.js 必須更新 cache bust');
+assert.ok(html.includes('app.js?v=2026100101'), 'admin/app.js 必須更新 cache bust');
 const adminOrderCreate = readFileSync(new URL('../netlify/functions/admin-order-create.js', import.meta.url), 'utf8');
 assert.ok(html.includes('id="createManualOrder"') && app.includes('openManualOrder'), '訂單後台必須提供手動建立面交訂單');
 assert.ok(app.includes("['line','LINE']") && app.includes("['facebook','Facebook']") && app.includes("['instagram','Instagram']"), '手動訂單必須支援常用私訊聯繫管道');
