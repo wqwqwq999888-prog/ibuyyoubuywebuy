@@ -48,7 +48,7 @@ global.fetch = async (url, options) => {
   return { ok: true, text: async () => new URLSearchParams(result).toString() };
 };
 const { handler } = require('../netlify/functions/ecpay-reconcile');
-const call = (action = 'recover') => handler({ httpMethod: 'POST', headers: {}, body: JSON.stringify({ orderNo: id, action }) });
+const call = (action = 'recover') => handler({ httpMethod: 'POST', headers: {}, body: JSON.stringify({ orderNo: id, action, approved: true }) });
 
 (async () => {
   reset(); denied = true;
@@ -73,7 +73,7 @@ const call = (action = 'recover') => handler({ httpMethod: 'POST', headers: {}, 
   assert.equal(saved.partner_name, '團主'); assert.equal(saved.discount_amount, 281);
   assert.equal(saved.order_amount, 2529); assert.equal(saved.payment_status, '已付款');
   reset(); sheetFails = true;
-  assert.equal(JSON.parse((await call()).body).sheetSynced, false); assert.ok(pending); assert.equal(writes, 1);
+  assert.equal((await call()).statusCode, 400); assert.ok(pending); assert.equal(writes, 1);
   sheetFails = false;
   assert.equal(JSON.parse((await call()).body).sheetSynced, true); assert.equal(writes, 1); assert.equal(syncs, 2); assert.equal(pending, null);
   reset(); saved = { order_amount: 2529, trade_no: 'DIFFERENT', payment_status: '已付款' };
@@ -81,10 +81,25 @@ const call = (action = 'recover') => handler({ httpMethod: 'POST', headers: {}, 
 
   // A signed simulator callback must not read/write orders or sync mail.
   reset();
-  const callback = { MerchantTradeNo: id, TradeNo: 'SIMULATED', TradeAmt: '2529', RtnCode: '1', SimulatePaid: '1' };
+  const callback = { MerchantID: '3504484', MerchantTradeNo: id, TradeNo: 'SIMULATED', TradeAmt: '2529', RtnCode: '1', SimulatePaid: '1' };
   callback.CheckMacValue = checkMacValue(callback);
   const { handler: callbackHandler } = require('../netlify/functions/ecpay-return');
   assert.equal((await callbackHandler({ httpMethod: 'POST', body: new URLSearchParams(callback).toString() })).body, '1|OK');
   assert.equal(writes, 0); assert.equal(syncs, 0); assert.ok(pending);
+  reset();
+  const unapproved = await handler({ httpMethod: 'POST', headers: {}, body: JSON.stringify({orderNo:id,action:'recover'}) });
+  assert.equal(unapproved.statusCode, 400); assert.equal(writes, 0);
+  const realCallback = { ...callback, SimulatePaid: '0', TradeNo: payment.TradeNo };
+  realCallback.CheckMacValue = checkMacValue(realCallback);
+  const deliver = () => callbackHandler({ httpMethod: 'POST', body: new URLSearchParams(realCallback).toString() });
+  reset(); sheetFails = true;
+  assert.equal((await deliver()).body, '0|OrderError'); assert.equal(writes, 1); assert.ok(pending);
+  sheetFails = false;
+  assert.equal((await deliver()).body, '1|OK'); assert.equal(writes, 1); assert.equal(syncs, 2); assert.equal(pending, null);
+  assert.equal((await deliver()).body, '1|OK'); assert.equal(syncs, 2);
+  reset(); pending.check_status = 'paid_missing';
+  assert.equal((await deliver()).body, '1|OK'); assert.equal(writes, 0); assert.equal(syncs, 0);
+  reset(); pending = null;
+  assert.equal((await deliver()).body, '0|OrderError'); assert.equal(writes, 0);
   console.log('ECPay reconciliation and simulation checks passed.');
 })().catch(error => { console.error(error); process.exitCode = 1; });

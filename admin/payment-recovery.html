@@ -2,16 +2,16 @@
 <html lang="zh-Hant">
 <head>
   <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>付款查帳與補單｜鬥陣買</title>
+  <title>06 付款查核｜鬥陣買</title>
   <style>
     body{margin:0;background:#f5f7fa;color:#25323d;font:16px/1.7 system-ui,sans-serif}main{max-width:900px;margin:48px auto;padding:24px}h1{font-size:28px}a{color:#24795e}section{background:white;border:1px solid #dfe5eb;border-radius:12px;padding:24px;margin:20px 0}button{font:inherit;padding:9px 16px;border:1px solid #ccd5dc;border-radius:6px;background:white;cursor:pointer}button:disabled{opacity:.5;cursor:default}.recover{background:#24795e;color:white}.row{border-top:1px solid #dfe5eb;padding:20px 0}.actions{display:flex;gap:12px;flex-wrap:wrap}.status{white-space:pre-wrap}#message{color:#8a3e16}.muted{color:#667583}
   </style>
 </head>
 <body><main>
-  <a href="./">← 商店後台</a><h1>付款查帳與補單</h1>
-  <p>針對付款後未出現在訂單清單的交易，先向綠界核對實際付款狀態，再補回原訂單。</p>
+  <a href="./">← 商店後台</a><h1>06 付款查核</h1>
+  <p>系統自動核對超過 10 分鐘仍未完成的付款，發現漏單或查核異常時寄信提醒商家。只有你確認同意後，才會補回漏單。</p>
   <section>
-    <p>「查帳」不會變更訂單。「補回訂單與通知」會保留原始金額與團購來源、同步試算表，並依訂單通知設定寄信。這裡不會扣款、退款或建立物流單。</p>
+    <p>「查帳」不會變更訂單。「同意補單並寄送通知」會保留原始金額與團購來源、同步試算表，並依訂單通知設定寄信。這裡不會扣款、退款或建立物流單。</p>
     <p class="muted">測試刷卡若補成正式訂單，也會計入銷售與團購報表。請先確認要補回的對象。</p>
     <button id="refresh">重新讀取待核對交易</button><p id="message" role="status"></p><div id="orders"></div>
   </section>

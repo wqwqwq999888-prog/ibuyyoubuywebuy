@@ -1,76 +1,30 @@
-const crypto = require('crypto');
-const { supabase, normalizeOrder, validateProductPricing, addProductCosts, syncSheet } = require('./_orders');
-const { sendPurchase } = require('./_analytics');
-
-exports.handler = async (event) => {
-  if (event.httpMethod !== 'POST') {
-    return { statusCode: 405, body: 'Method Not Allowed' };
-  }
-
-  const HASH_KEY = process.env.ECPAY_HASH_KEY;
-  const HASH_IV = process.env.ECPAY_HASH_IV;
-
-  const params = Object.fromEntries(new URLSearchParams(event.body));
-  const receivedMac = params.CheckMacValue;
-  delete params.CheckMacValue;
-
-  const sorted = Object.keys(params).sort((a, b) =>
-    a.toLowerCase().localeCompare(b.toLowerCase())
-  );
-  let str = `HashKey=${HASH_KEY}`;
-  sorted.forEach(key => { str += `&${key}=${params[key]}`; });
-  str += `&HashIV=${HASH_IV}`;
-  str = encodeURIComponent(str).toLowerCase()
-    .replace(/%2d/g, '-').replace(/%5f/g, '_')
-    .replace(/%2e/g, '.').replace(/%21/g, '!')
-    .replace(/%2a/g, '*').replace(/%28/g, '(')
-    .replace(/%29/g, ')').replace(/%20/g, '+');
-
-  const computedMac = crypto
-    .createHash('sha256').update(str).digest('hex').toUpperCase();
-
-  if (computedMac !== receivedMac) {
-    console.error('CheckMacValue 驗證失敗');
-    return { statusCode: 200, body: '0|Error' };
-  }
-
-  // ECPay's dashboard simulator also sends RtnCode=1. It is not evidence of
-  // payment and must never create an order, send mail, or consume pending data.
-  if (params.SimulatePaid === '1') {
-    return { statusCode: 200, headers: { 'Content-Type': 'text/plain' }, body: '1|OK' };
-  }
-
-  if (params.RtnCode === '1') {
-    const orderId = params.MerchantTradeNo;
-    try {
-      const existing = await supabase(`orders?order_no=eq.${encodeURIComponent(orderId)}&select=order_no`);
-      // ECPay retries callbacks and its simulator can send the same callback
-      // repeatedly.  An already-created order has nothing left to do.
-      if (existing.length) return { statusCode: 200, headers: { 'Content-Type': 'text/plain' }, body: '1|OK' };
-      const pending = await supabase(`pending_ecpay_orders?order_no=eq.${encodeURIComponent(orderId)}&select=*`);
-      // A deliberately cancelled test order may already have been deleted
-      // locally. ACK it rather than resurrecting it from callback data.
-      if (!pending.length) return { statusCode: 200, headers: { 'Content-Type': 'text/plain' }, body: '1|OK' };
-      const repriced = await validateProductPricing(normalizeOrder({ ...pending[0].payload, tradeNo: params.TradeNo }, '已付款'));
-      if (Number(params.TradeAmt) !== pending[0].expected_amount || Number(params.TradeAmt) !== repriced.order_amount) {
-        return { statusCode: 200, body: '0|AmountError' };
-      }
-      const order = await addProductCosts(repriced);
-      const created = await supabase('orders?on_conflict=order_no', { method: 'POST', headers: { Prefer: 'resolution=ignore-duplicates,return=representation' }, body: JSON.stringify(order) });
-      if (created.length) {
-        await syncSheet(created[0]);
-        await sendPurchase(created[0]);
-      }
-      await supabase(`pending_ecpay_orders?order_no=eq.${encodeURIComponent(orderId)}`, { method: 'DELETE' });
-    } catch(e) {
-      console.error('建立付款訂單失敗:', e);
-      return { statusCode: 200, body: '0|OrderError' };
+const { supabase } = require('./_orders');
+const { checkMacValue } = require('./_ecpay');
+const { completePayment, assertSamePayment } = require('./_payment-order');
+const reply = body => ({ statusCode: 200, headers: { 'Content-Type': 'text/plain' }, body });
+exports.handler = async event => {
+  if (event.httpMethod !== 'POST') return { statusCode: 405, body: 'Method Not Allowed' };
+  if (!process.env.ECPAY_HASH_KEY || !process.env.ECPAY_HASH_IV) return reply('0|ConfigurationError');
+  const body = event.isBase64Encoded ? Buffer.from(event.body || '', 'base64').toString() : event.body;
+  const params = Object.fromEntries(new URLSearchParams(body));
+  if (!params.CheckMacValue || checkMacValue(params) !== params.CheckMacValue) return reply('0|MacError');
+  if (params.MerchantID !== (process.env.ECPAY_MERCHANT_ID || '3504484')) return reply('0|MerchantError');
+  if (params.SimulatePaid === '1' || params.RtnCode !== '1') return reply('1|OK');
+  if (!/^[a-zA-Z0-9]{1,20}$/.test(params.MerchantTradeNo || '') || !params.TradeNo) return reply('0|OrderError');
+  try {
+    const pending = await supabase(`pending_ecpay_orders?order_no=eq.${encodeURIComponent(params.MerchantTradeNo)}&select=*`);
+    if (!pending.length) {
+      const existing = await supabase(`orders?order_no=eq.${encodeURIComponent(params.MerchantTradeNo)}&select=*`);
+      assertSamePayment(existing[0], params);
+      return reply('1|OK');
     }
+    // Once a missing payment has been flagged for review, only admin approval
+    // may recover it, even if a late callback subsequently arrives.
+    if (pending[0].check_status === 'paid_missing') return reply('1|OK');
+    await completePayment(pending[0], params, 'ecpay_callback');
+    return reply('1|OK');
+  } catch (error) {
+    console.error('Payment callback incomplete', params.MerchantTradeNo, error.message);
+    return reply('0|OrderError');
   }
-
-  return {
-    statusCode: 200,
-    headers: { 'Content-Type': 'text/plain' },
-    body: '1|OK',
-  };
 };

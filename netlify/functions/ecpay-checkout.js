@@ -34,7 +34,11 @@ exports.handler = async (event) => {
   const HASH_KEY = process.env.ECPAY_HASH_KEY;
   const HASH_IV = process.env.ECPAY_HASH_IV;
 
-  const request = JSON.parse(event.body || '{}');
+  let request;
+  try { request = JSON.parse(event.body || '{}'); } catch { return { statusCode: 400, body: 'Invalid JSON' }; }
+  if (!request.order || !request.params || !HASH_KEY || !HASH_IV) return { statusCode: 400, body: '付款訂單資料或設定不完整' };
+  const paymentOrigin = process.env.CONTEXT === 'deploy-preview' ? process.env.DEPLOY_PRIME_URL : 'https://douzhenmai.com';
+  if (!paymentOrigin || !/^https:\/\//.test(paymentOrigin)) return { statusCode: 500, body: '付款回傳設定不完整' };
   if (request.order) request.order.campaignId = campaignIdFromCookie(event);
   const requestedParams = request.params || request;
   // Keep the payment payload assembled on the server.  Besides preventing the
@@ -42,7 +46,9 @@ exports.handler = async (event) => {
   // that the payer and order references reach ECPay in both checkout flows.
   const params = {
     ...requestedParams,
-    MerchantID: process.env.ECPAY_MERCHANT_ID || requestedParams.MerchantID || '3504484',
+    MerchantID: process.env.ECPAY_MERCHANT_ID || '3504484',
+    ReturnURL: `${paymentOrigin}/.netlify/functions/ecpay-return`,
+    OrderResultURL: `${paymentOrigin}/.netlify/functions/ecpay-order-result`,
     CustomField1: String(request.order?.customer?.name || requestedParams.CustomField1 || ''),
     CustomField2: String(request.order?.customer?.phone || requestedParams.CustomField2 || ''),
     CustomField3: String(request.order?.customer?.email || requestedParams.CustomField3 || ''),
@@ -67,8 +73,8 @@ exports.handler = async (event) => {
       shippingFee: pending.shipping_fee,
       total: pending.order_amount
     };
-    await supabase('pending_ecpay_orders?on_conflict=order_no', {
-      method: 'POST', headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
+    await supabase('pending_ecpay_orders', {
+      method: 'POST', headers: { Prefer: 'return=minimal' },
       body: JSON.stringify({ order_no: pending.order_no, payload: validatedPayload, expected_amount: pending.order_amount })
     });
   }
