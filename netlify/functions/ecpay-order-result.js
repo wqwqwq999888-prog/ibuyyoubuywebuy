@@ -1,64 +1,79 @@
-const crypto = require('crypto');
+const { checkMacValue } = require('./_ecpay');
+const { supabase } = require('./_orders');
+const { queryPayment } = require('./_payment-query');
+const { completePayment, assertSamePayment } = require('./_payment-order');
 
-exports.handler = async (event) => {
-  // 綠界會用 POST 導回來；非 POST 直接擋掉
-  if (event.httpMethod !== 'POST') {
-    return { statusCode: 405, body: 'Method Not Allowed' };
-  }
-
-  const HASH_KEY = process.env.ECPAY_HASH_KEY;
-  const HASH_IV = process.env.ECPAY_HASH_IV;
-
-  // 解析綠界傳來的參數
-  const params = Object.fromEntries(new URLSearchParams(event.body));
-  const receivedMac = params.CheckMacValue;
-  delete params.CheckMacValue;
-
-  // 驗證 CheckMacValue
-  const sorted = Object.keys(params).sort((a, b) =>
-    a.toLowerCase().localeCompare(b.toLowerCase())
-  );
-  let str = `HashKey=${HASH_KEY}`;
-  sorted.forEach(key => { str += `&${key}=${params[key]}`; });
-  str += `&HashIV=${HASH_IV}`;
-  str = encodeURIComponent(str).toLowerCase()
-    .replace(/%2d/g, '-').replace(/%5f/g, '_')
-    .replace(/%2e/g, '.').replace(/%21/g, '!')
-    .replace(/%2a/g, '*').replace(/%28/g, '(')
-    .replace(/%29/g, ')').replace(/%20/g, '+');
-  const computedMac = crypto
-    .createHash('sha256').update(str).digest('hex').toUpperCase();
-
-  const macOk = computedMac === receivedMac;
-  const paid = params.RtnCode === '1';
-  const isSuccess = macOk && paid;
+// The browser only transports ECPay's signed result. All verification and
+// finalization happen here on the server, using the stored checkout snapshot.
+exports.handler = async event => {
+  if (event.httpMethod !== 'POST') return { statusCode: 405, body: 'Method Not Allowed' };
+  const body = event.isBase64Encoded ? Buffer.from(event.body || '', 'base64').toString() : event.body;
+  const params = Object.fromEntries(new URLSearchParams(body));
   const orderId = params.MerchantTradeNo || '';
-  const tradeNo = params.TradeNo || '';
-  const tradeAmt = params.TradeAmt || '';
-
-  // 正式訂單只由 ReturnURL 的伺服器通知建立；瀏覽器導回頁絕不寫入訂單或試算表。
-
-  const html = isSuccess
-    ? renderSuccess(orderId)
-    : renderFailure(params.RtnMsg || '付款未完成', orderId);
-
-  return {
-    statusCode: 200,
-    headers: {
-      'Content-Type': 'text/html; charset=utf-8',
-      'Cache-Control': 'no-store'
-    },
-    body: html,
-  };
+  const valid = process.env.ECPAY_HASH_KEY && process.env.ECPAY_HASH_IV && params.CheckMacValue &&
+    checkMacValue(params) === params.CheckMacValue &&
+    params.MerchantID === (process.env.ECPAY_MERCHANT_ID || '3504484');
+  let html;
+  if (!valid) html = renderSuccess(orderId, 'unverified');
+  else if (params.SimulatePaid === '1') html = renderSuccess(orderId, 'simulation');
+  else if (params.RtnCode !== '1') html = renderFailure(params.RtnMsg || '付款未完成', orderId);
+  else {
+    let state = 'pending';
+    try { state = await finishBrowserPayment(params); }
+    catch (error) {
+      // Never show "pay again" for an authenticated successful payment whose
+      // database or mail synchronization is temporarily unavailable.
+      console.error('Browser payment finalization incomplete', orderId, error.message);
+    }
+    html = renderSuccess(orderId, state);
+  }
+  return { statusCode: 200, headers: {
+    'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store'
+  }, body: html };
 };
 
-function renderSuccess(orderId) {
+async function finishBrowserPayment(params) {
+  if (!/^[a-zA-Z0-9]{1,20}$/.test(params.MerchantTradeNo || '') || !params.TradeNo ||
+      !/^\d+$/.test(params.TradeAmt || '')) throw new Error('Invalid payment reference');
+  const pendingPath = `pending_ecpay_orders?order_no=eq.${encodeURIComponent(params.MerchantTradeNo)}&select=*`;
+  const existingPath = `orders?order_no=eq.${encodeURIComponent(params.MerchantTradeNo)}&select=*`;
+  let pending = (await supabase(pendingPath))[0];
+  if (!pending) {
+    assertSamePayment((await supabase(existingPath))[0], params);
+    return 'complete';
+  }
+  if (pending.review_required || pending.check_status === 'paid_missing') return 'review';
+  const payment = await queryPayment(params.MerchantTradeNo);
+  if (payment.TradeNo !== params.TradeNo || Number(payment.TradeAmt) !== Number(params.TradeAmt)) {
+    throw new Error('Payment result and query do not match');
+  }
+  // A callback or the monitor may have completed/flagged it while querying.
+  pending = (await supabase(pendingPath))[0];
+  if (!pending) {
+    assertSamePayment((await supabase(existingPath))[0], payment);
+    return 'complete';
+  }
+  if (pending.review_required || pending.check_status === 'paid_missing') return 'review';
+  await completePayment(pending, payment, 'ecpay_browser_query');
+  return 'complete';
+}
+
+function renderSuccess(orderId, state = 'complete') {
+  const complete = state === 'complete';
+  const messages = {
+    complete: ['付款成功！', '訂單已成立，訂單確認信已送出。', '若未在收件匣看到，請檢查垃圾郵件資料夾。'],
+    pending: ['付款結果處理中', '已收到綠界付款成功結果，訂單或通知仍在處理中。', '請勿重複付款。若未收到確認信，請提供下方訂單編號聯絡我們。'],
+    review: ['付款結果待核對', '這筆交易已交由商家核對，確認後會通知你。', '請勿重複付款，並保留下方訂單編號。'],
+    unverified: ['付款狀態確認中', '目前無法驗證這次付款結果。', '請勿重複付款，請提供訂單編號聯絡我們確認。'],
+    simulation: ['付款通知測試', '這是模擬通知，沒有建立訂單或寄出確認信。', '此畫面不代表實際付款結果。']
+  };
+  const message = messages[state];
   return `<!DOCTYPE html>
 <html lang="zh-TW">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>付款成功 | 鬥陣買肉乾</title>
+<title>${message[0]} | 鬥陣買肉乾</title>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@400;600;700&family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
 <style>
   :root{
@@ -111,18 +126,17 @@ function renderSuccess(orderId) {
   </div>
 
   <div class="wrap">
-    <div class="icon">🎉</div>
-    <h1>付款成功！</h1>
-    <p class="msg">感謝你的訂購，我們已收到你的信用卡付款。</p>
-    <p class="msg">訂單確認信將在幾分鐘內寄送到你的 Email。</p>
-    <p class="msg-dim">📬 若未在收件匣看到，請檢查垃圾郵件資料夾。</p>
+    <div class="icon">${complete ? "🎉" : "⏳"}</div>
+    <h1>${message[0]}</h1>
+    <p class="msg">${message[1]}</p>
+    <p class="msg-dim">${message[2]}</p>
 
     <div class="order-box">
       <div class="order-label">你的訂單編號</div>
       <div class="order-num">${escapeHTML(orderId)}</div>
     </div>
 
-    <p class="note">💨 我們將盡速為你備貨出貨，讓美味早點到你手中！</p>
+    <p class="note">${complete ? "我們將盡速為你備貨出貨，讓美味早點到你手中！" : "需要協助時，請透過官方 LINE 與我們聯絡。"}<br><a href="https://lin.ee/wvbqdo7" style="color:var(--gold)">聯絡我們</a></p>
 
     <a href="/" class="btn">繼續逛逛</a>
   </div>
@@ -130,8 +144,10 @@ function renderSuccess(orderId) {
   <script>
     // 訂單完成，清空購物車暫存
     try {
-      localStorage.removeItem('cart');
-      localStorage.removeItem('checkoutData');
+      if (${complete}) {
+        localStorage.removeItem('cart');
+        localStorage.removeItem('checkoutData');
+      }
     } catch(e){}
   </script>
 </body>
