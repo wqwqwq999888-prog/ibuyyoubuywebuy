@@ -36,9 +36,9 @@ async function checkPending(pending) {
 }
 
 exports.handler = async () => {
-  // Netlify schedules only run on published production deploys. This additional
-  // guard also prevents accidental preview invocation from sending live mail.
-  if (process.env.CONTEXT !== 'production' || process.env.PAYMENT_MONITOR_ENABLED !== 'true') return { statusCode: 200, body: 'Preview: monitoring disabled' };
+  // Enable this variable ONLY in Netlify's Production deploy context. CONTEXT
+  // is a build-time variable and may be absent in the Functions runtime.
+  if ((process.env.CONTEXT && process.env.CONTEXT !== 'production') || process.env.PAYMENT_MONITOR_ENABLED !== 'true') return { statusCode: 200, body: 'Monitoring disabled' };
   try {
     const rows = await supabase('rpc/claim_payment_checks', { method: 'POST', body: '{}' });
     for (const pending of rows) await checkPending(pending);

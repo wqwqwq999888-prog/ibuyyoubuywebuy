@@ -29,6 +29,10 @@ process.env.GOOGLE_SHEET_WEBHOOK_URL = 'https://example.invalid';
 process.env.PAYMENT_MONITOR_ENABLED = 'true';
 (async () => {
   reset(); process.env.CONTEXT = 'deploy-preview'; await handler(); assert.equal(claimed, false); assert.equal(alerts, 0);
+  reset(); delete process.env.CONTEXT; delete process.env.PAYMENT_MONITOR_ENABLED;
+  await handler(); assert.equal(claimed, false, 'unconfigured contexts must remain disabled');
+  process.env.PAYMENT_MONITOR_ENABLED = 'true';
+  assert.equal((await handler()).statusCode, 200); assert.equal(claimed, true, 'production runtime must not depend on build-only CONTEXT');
   reset(); await checkPending(row); assert.equal(row.check_status, 'paid_missing'); assert.equal(alerts, 1); assert.ok(row.alerted_at); assert.equal(row.review_required, true);
   await checkPending(row); assert.equal(alerts, 1, 'same unresolved issue must not spam');
   reset(); payment.TradeStatus = '0'; await checkPending(row); assert.equal(row.check_status, 'unpaid'); assert.equal(alerts, 0);
