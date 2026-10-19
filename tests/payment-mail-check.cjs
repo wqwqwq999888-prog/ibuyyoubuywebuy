@@ -29,4 +29,5 @@ send('updateStatus');assert.equal(mails.length,2);
 const alert={order_no:'D456',order_amount:659,alert_status:'paid_missing',alert_key:'D456:paid_missing'};
 assert.equal(send('paymentAlert',alert),'OK');assert.equal(rows.length,2);assert.equal(mails.length,3);assert.equal(mails[2].to,'owner@example.com');
 assert.equal(send('paymentAlert',alert),'OK');assert.equal(mails.length,3);
+assert.equal(send('manualOrder', {...order,order_no:'MANUAL'}),'OK'); assert.equal(rows.length,3); assert.equal(mails.length,3);
 console.log('Payment alert isolation and per-recipient notification retry checks passed.');

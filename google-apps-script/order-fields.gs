@@ -96,7 +96,7 @@ function handleOrderWebhook(e, request) {
 
 function handleVerifiedOrderWebhook_(request) {
   if (request.action === 'paymentAlert') return notifyPaymentAlert_(request.order);
-  if (['upsertOrder', 'updateStatus', 'deleteOrder'].indexOf(request.action) < 0) return ContentService.createTextOutput('Unknown action');
+  if (['upsertOrder', 'updateStatus', 'manualOrder', 'deleteOrder'].indexOf(request.action) < 0) return ContentService.createTextOutput('Unknown action');
   var order = request.order;
   var spreadsheet = SpreadsheetApp.openById(ORDER_SPREADSHEET_ID);
   var sheets = spreadsheet ? spreadsheet.getSheets() : [];

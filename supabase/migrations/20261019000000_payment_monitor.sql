@@ -5,7 +5,8 @@ alter table public.pending_ecpay_orders
   add column if not exists next_check_at timestamptz not null default now(),
   add column if not exists check_status text not null default 'unchecked',
   add column if not exists check_error text,
-  add column if not exists alerted_at timestamptz;
+  add column if not exists alerted_at timestamptz,
+  add column if not exists review_required boolean not null default false;
 create index if not exists pending_payment_check_idx on public.pending_ecpay_orders(next_check_at);
 create table if not exists public.payment_monitor_state (
   id integer primary key check (id=1), last_run_at timestamptz,

@@ -99,6 +99,8 @@ const call = (action = 'recover') => handler({ httpMethod: 'POST', headers: {}, 
   assert.equal((await deliver()).body, '1|OK'); assert.equal(syncs, 2);
   reset(); pending.check_status = 'paid_missing';
   assert.equal((await deliver()).body, '1|OK'); assert.equal(writes, 0); assert.equal(syncs, 0);
+  reset(); pending.review_required = true; pending.check_status = 'check_failed';
+  assert.equal((await deliver()).body, '1|OK'); assert.equal(writes, 0);
   reset(); pending = null;
   assert.equal((await deliver()).body, '0|OrderError'); assert.equal(writes, 0);
   console.log('ECPay reconciliation and simulation checks passed.');

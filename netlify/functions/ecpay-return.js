@@ -20,7 +20,7 @@ exports.handler = async event => {
     }
     // Once a missing payment has been flagged for review, only admin approval
     // may recover it, even if a late callback subsequently arrives.
-    if (pending[0].check_status === 'paid_missing') return reply('1|OK');
+    if (pending[0].review_required || pending[0].check_status === 'paid_missing') return reply('1|OK');
     await completePayment(pending[0], params, 'ecpay_callback');
     return reply('1|OK');
   } catch (error) {

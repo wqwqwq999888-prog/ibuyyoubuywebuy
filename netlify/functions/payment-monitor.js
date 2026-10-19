@@ -20,7 +20,7 @@ async function checkPending(pending) {
     status = 'check_failed'; error = failure.message;
   }
   await supabase(path, { method: 'PATCH', body: JSON.stringify({
-    check_status: status, check_error: error, ...(pending.check_status !== status ? { alerted_at: null } : {}), last_checked_at: new Date().toISOString(),
+    check_status: status, check_error: error, ...(status === 'paid_missing' ? { review_required: true } : {}), ...(pending.check_status !== status ? { alerted_at: null } : {}), last_checked_at: new Date().toISOString(),
     // Older abandoned checkouts remain visible and are checked daily; never delete them.
     next_check_at: new Date(Date.now() + (Date.now() - Date.parse(pending.created_at) > 86400000 ? 86400000 : 600000)).toISOString()
   }) });
