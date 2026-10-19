@@ -34,6 +34,12 @@ exports.handler = async (event) => {
     return { statusCode: 200, body: '0|Error' };
   }
 
+  // ECPay's dashboard simulator also sends RtnCode=1. It is not evidence of
+  // payment and must never create an order, send mail, or consume pending data.
+  if (params.SimulatePaid === '1') {
+    return { statusCode: 200, headers: { 'Content-Type': 'text/plain' }, body: '1|OK' };
+  }
+
   if (params.RtnCode === '1') {
     const orderId = params.MerchantTradeNo;
     try {
