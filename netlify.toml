@@ -20,3 +20,6 @@
   for = "/analytics.js"
   [headers.values]
     Cache-Control = "no-cache, no-store, must-revalidate"
+
+[functions."payment-monitor"]
+  schedule = "* * * * *"

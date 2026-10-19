@@ -88,6 +88,15 @@ function handleOrderWebhook(e, request) {
   var supplied = e && e.parameter && e.parameter.secret;
   if (!expected || supplied !== expected) return ContentService.createTextOutput('Unauthorized');
 
+  var lock = LockService.getScriptLock();
+  lock.waitLock(10000);
+  try { return handleVerifiedOrderWebhook_(request); }
+  finally { lock.releaseLock(); }
+}
+
+function handleVerifiedOrderWebhook_(request) {
+  if (request.action === 'paymentAlert') return notifyPaymentAlert_(request.order);
+  if (['upsertOrder', 'updateStatus', 'manualOrder', 'deleteOrder'].indexOf(request.action) < 0) return ContentService.createTextOutput('Unknown action');
   var order = request.order;
   var spreadsheet = SpreadsheetApp.openById(ORDER_SPREADSHEET_ID);
   var sheets = spreadsheet ? spreadsheet.getSheets() : [];
@@ -129,9 +138,10 @@ function handleOrderWebhook(e, request) {
   if (rowIndex > 0) sheet.getRange(rowIndex + 1, 1, 1, 24).setValues([row]);
   else {
     sheet.appendRow(row);
-    // 只有正式新建訂單寄信；後台 updateStatus 不得重複寄送確認信。
-    if (request.action === 'upsertOrder') notifyNewServerOrder_(order, itemsText);
   }
+  // Track each recipient separately. A failed customer email can be retried
+  // after the row/owner notification succeeded, without resending the owner mail.
+  if (request.action === 'upsertOrder') notifyNewServerOrder_(order, itemsText);
   return ContentService.createTextOutput('OK');
 }
 
@@ -162,6 +172,38 @@ function notifyNewServerOrder_(order, itemsText) {
     '\n商品：' + itemsText + '\n總額：NT$ ' + order.order_amount +
     '\n付款狀態：' + order.payment_status + '\n出貨狀態：' + order.shipping_status;
   var mailOptions = {name:'鬥陣買肉乾', from:ORDER_FROM_EMAIL, replyTo:ORDER_FROM_EMAIL};
-  GmailApp.sendEmail(NOTIFY_EMAIL, '新訂單！' + order.customer_name + ' NT$' + order.order_amount + '－鬥陣買肉乾', ownerBody, mailOptions);
-  if (order.customer_email) GmailApp.sendEmail(order.customer_email, '【鬥陣買肉乾】訂單確認 － ' + order.order_no, customerBody, mailOptions);
+  sendNotificationOnce_('order:' + order.order_no + ':owner', NOTIFY_EMAIL, '新訂單！' + order.customer_name + ' NT$' + order.order_amount + '－鬥陣買肉乾', ownerBody, mailOptions);
+  if (order.customer_email) sendNotificationOnce_('order:' + order.order_no + ':customer', order.customer_email, '【鬥陣買肉乾】訂單確認 － ' + order.order_no, customerBody, mailOptions);
+}
+
+// This journal is separate from order rows. Never interpret an alert as an order.
+// LockService serializes retries. A process interruption immediately after Gmail
+// accepts a send can still cause a duplicate on retry (no atomic Gmail transaction).
+function sendNotificationOnce_(key, recipient, subject, body, options) {
+  var spreadsheet = SpreadsheetApp.openById(ORDER_SPREADSHEET_ID);
+  var journal = spreadsheet.getSheetByName('_通知紀錄');
+  if (!journal) {
+    journal = spreadsheet.insertSheet('_通知紀錄');
+    journal.appendRow(['通知識別碼', '寄送時間']);
+    journal.hideSheet();
+  }
+  var records = journal.getDataRange().getValues();
+  if (records.some(function(row) { return String(row[0]) === key; })) return;
+  GmailApp.sendEmail(recipient, subject, body, options);
+  journal.appendRow([key, new Date()]);
+  SpreadsheetApp.flush();
+}
+
+function notifyPaymentAlert_(alert) {
+  var labels = {paid_missing:'綠界已付款，但網站尚未建立訂單',sync_pending:'訂單已建立，但通知同步尚未完成',check_failed:'付款查核異常，需要人工確認',monitor_failed:'自動付款查核執行異常'};
+  var label = labels[alert.alert_status];
+  if (!label || !alert.alert_key) return ContentService.createTextOutput('Invalid alert');
+  var body = label + '\n訂單編號：' + alert.order_no +
+    (alert.order_amount != null ? '\n金額：NT$ ' + alert.order_amount : '') +
+    '\n\n請登入後台「06 付款查核」核對。漏單須經你同意才會補回，不會自動建立訂單或寄信給客戶。' +
+    '\nhttps://douzhenmai.com/admin/payment-recovery.html';
+  sendNotificationOnce_('alert:' + alert.alert_key, NOTIFY_EMAIL,
+    '【鬥陣買】付款查核提醒－' + alert.order_no, body,
+    {name:'鬥陣買肉乾', from:ORDER_FROM_EMAIL, replyTo:ORDER_FROM_EMAIL});
+  return ContentService.createTextOutput('OK');
 }

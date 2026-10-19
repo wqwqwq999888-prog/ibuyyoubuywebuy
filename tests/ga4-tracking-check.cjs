@@ -66,7 +66,9 @@ assert.deepStrictEqual(JSON.parse(JSON.stringify(purchaseEvents[0][2])), {
 assert.strictEqual((home.match(/G-FRZ2RMV82S/g) || []).length, 1);
 assert.strictEqual((checkout.match(/G-FRZ2RMV82S/g) || []).length, 1);
 assert(orderHelpers.includes('analytics: data.analytics || null'), 'order attribution is not retained for purchase tracking');
-assert.match(ecpayReturn, /if \(created\.length\) \{[\s\S]*await syncSheet\(created\[0\]\);[\s\S]*await sendPurchase\(created\[0\]\);[\s\S]*\}/);
+assert.match(ecpayReturn, /await completePayment/);
+const paymentHelper = fs.readFileSync('netlify/functions/_payment-order.js', 'utf8');
+assert.match(paymentHelper, /if \(created\.length\) await sendPurchase\(saved\);/);
 assert.match(orderCreate, /if \(created\.length\) await sendPurchase\(savedOrder\);/);
 assert(!statusSync.includes('sendPurchase'), 'admin payment-status changes must not duplicate purchase tracking');
 

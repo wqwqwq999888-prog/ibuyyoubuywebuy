@@ -99,7 +99,8 @@ assert.ok(orderCreate.includes('const existing = await supabase') && orderCreate
 assert.ok(statusSync.includes('event.headers.Authorization'), 'Netlify 管理員驗證必須兼容 Authorization header 大小寫');
 assert.ok(orderHelper.includes('responseText !== expectedResponse'), 'Google Sheet webhook 必須檢查 Apps Script 回應內容');
 assert.ok(orderHelper.includes("apikey: SUPABASE_KEY") && !orderHelper.includes('Bearer ${SUPABASE_KEY}'), 'sb_secret_ 只能作為 apikey');
-assert.ok(ecpayReturn.includes("params.RtnCode === '1'") && ecpayReturn.includes('expected_amount'), '綠界成功及金額驗證後才可建立訂單');
+const paymentOrder = readFileSync(new URL('../netlify/functions/_payment-order.js', import.meta.url), 'utf8');
+assert.ok(ecpayReturn.includes("params.RtnCode !== '1'") && ecpayReturn.includes('await completePayment') && paymentOrder.includes('expected_amount'), '綠界成功及金額驗證後才可建立訂單');
 assert.ok(orderCreate.includes('await validateProductPricing') && ecpayCheckout.includes('await validateProductPricing'), '匯款建單與綠界付款初始化都必須驗證後台商品價格');
 assert.ok(orderHelper.includes('shipping_methods?id=eq.') && orderHelper.includes('method.enabled !== true'), '後端必須重新讀取物流設定並拒絕停用方式');
 assert.ok(!checkout.includes('shippingFee = 65') && !checkout.includes('discountedSubtotal >= 1500'), '結帳頁不得寫死運費或免運門檻');
@@ -128,7 +129,7 @@ assert.ok(logisticsCreate.includes("['已付款', '已匯款待確認']"), '信�
 assert.ok(app.includes('建立綠界物流單') && app.includes('data-create-logistics'), '後台配送資料欄必須提供物流建單操作');
 assert.ok(logisticsCallback.includes("checkMacValue(params, 'md5')") && logisticsCallback.includes("body: '1|OK'"), '物流 callback 必須驗證 CheckMacValue 並 ACK');
 for (const column of ['logistics_trade_no','logistics_status','logistics_message','logistics_created_at']) assert.ok(logisticsMigration.includes(column), `物流 migration 缺少 ${column}`);
-assert.ok(ecpayReturn.includes('if (!pending.length)') && ecpayReturn.includes("body: '1|OK'"), '已刪除測試交易與重複付款 callback 必須只 ACK');
+assert.ok(ecpayReturn.includes('if (!pending.length)') && ecpayReturn.includes("assertSamePayment(existing[0], params)"), '暫存已移除時必須確認正式訂單相符，不得重建已刪除交易');
 assert.ok(ecpayCheckout.includes('CustomField1') && ecpayCheckout.includes('CustomField2') && ecpayCheckout.includes('CustomField3') && ecpayCheckout.includes('CustomField4'), '付款參數必須包含付款人與訂單資訊');
 assert.ok(ecpayCheckout.includes('JSON.stringify({ params, CheckMacValue: checkMacValue })'), 'Server 必須回傳完整簽章參數');
 assert.equal((checkout.match(/Object\.assign\(params, data\.params, \{ CheckMacValue: data\.CheckMacValue \}\)/g)||[]).length, 2, '兩個信用卡入口都必須採用 Server 完整參數');
