@@ -110,7 +110,7 @@ Netlify 正式環境需設定 `SUPABASE_URL`、`SUPABASE_SECRET_KEY`、`GOOGLE_S
 ### 上線順序
 
 1. 套用 `20261019000000_payment_monitor.sql`（僅新增查核欄位與管理狀態；不會補單）。
-2. 將 `google-apps-script/order-fields.gs` 的更新套用到既有 Apps Script 專案並發佈既有 Web App 的新版本。保留原 `doPost` 路由與既有設定。**必須先更新 Apps Script**；舊版不支援獨立提醒。
+2. 將 `google-apps-script/order-fields.gs` 的更新套用到既有 Apps Script 專案並發佈既有 Web App 的新版本。以 `google-apps-script/webhook-router.gs` 取代原本 `doPost`，保留其他舊函式與既有設定；新版 webhook 錯誤不可退回舊建單流程。**必須先更新 Apps Script**；舊版不支援獨立提醒。
 3. Deploy Preview 驗收通過後才合併正式版本。排程與通知在預覽版均不執行。
 4. 確認新的 Apps Script 已發佈後，才將 Netlify 正式環境 `PAYMENT_MONITOR_ENABLED=true` 並重新部署。未設此值時排程安全停用。
 5. 核對排程執行紀錄、06 最近執行時間、商家提醒信。只測通知、不核准 NT$659 測試單；真正付款測試由店主自行操作。
